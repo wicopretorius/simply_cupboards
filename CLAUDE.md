@@ -15,35 +15,41 @@ Temporary domains (until simplycupboards.com is purchased):
 ## Local development
 
 ### Prerequisites
-- Docker (for MySQL + Directus + phpMyAdmin)
-- Node.js (any version for Next.js dev)
+- Docker (for MySQL + phpMyAdmin only)
+- Node 22 via nvm (`nvm use 22` — see `.nvmrc`)
 
-### Start backend services
+### Start database
 ```bash
-docker compose up -d        # MySQL :3307, Directus :8055, phpMyAdmin :8081
-docker compose down         # stop all
-docker compose logs -f directus   # tail Directus logs
+docker compose up -d        # MySQL :3307, phpMyAdmin :8081
+docker compose down
 ```
+
+### Directus
+```bash
+cd directus
+nvm use 22
+npm install                 # first time only
+npm start                   # http://localhost:8055
+# First time only:
+npm run bootstrap           # creates DB tables + admin user
+```
+- Admin: `cupboards@jirehsoft.com` / `admin_password_123`
+- phpMyAdmin: `http://localhost:8081`
 
 ### Next.js app
 ```bash
 cd app
-npm install
+npm install                 # first time only
 npm run dev                 # http://localhost:3000
 npm run build
 ```
 
-### Directus (local)
-Running at `http://localhost:8055`
-- Admin: `cupboards@jirehsoft.com` / `admin_password_123`
-- phpMyAdmin: `http://localhost:8081`
-
 ### Directus schema workflow
 After changing the data model in the Directus UI, snapshot and commit it:
 ```bash
-docker exec simply-cupboards-directus \
-  npx directus schema snapshot /directus/snapshots/snapshot-$(date +%Y%m%d).yaml --yes
-git add directus/snapshots/ && git commit -m "chore: update Directus schema snapshot"
+cd directus
+npm run snapshot            # saves to directus/snapshots/snapshot-YYYYMMDD.yaml
+git add snapshots/ && git commit -m "chore: update Directus schema snapshot"
 ```
 
 ---
@@ -53,7 +59,7 @@ git add directus/snapshots/ && git commit -m "chore: update Directus schema snap
 Directus and Next.js run as native Node.js processes via PM2. **No Docker on the VPS** — too resource-constrained (4GB RAM, 2 vCPU) with WordPress sites co-hosted.
 
 - MySQL: HestiaCP built-in (port 3306)
-- Node.js: must be **v20 LTS** (see `.nvmrc`) — v25 breaks `isolated-vm` (Directus native module)
+- Node.js: must be **v22 LTS** (see `.nvmrc`) — v25 breaks `isolated-vm` (Directus native module)
 
 ### First-time deploy
 ```bash

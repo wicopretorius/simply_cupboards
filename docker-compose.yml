@@ -1,6 +1,5 @@
-# Local development only
-# MySQL + Directus + phpMyAdmin run here locally.
-# On the VPS: Directus and Next.js run natively via PM2 (see ecosystem.config.js).
+# Local development only — MySQL + phpMyAdmin
+# Directus and Next.js run natively (see directus/ and app/)
 name: simply-cupboards
 
 services:
@@ -23,33 +22,6 @@ services:
       timeout: 5s
       retries: 5
 
-  directus:
-    image: directus/directus:11.17.3
-    container_name: simply-cupboards-directus
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      KEY: ${DIRECTUS_KEY}
-      SECRET: ${DIRECTUS_SECRET}
-      DB_CLIENT: mysql
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_DATABASE: ${MYSQL_DATABASE}
-      DB_USER: ${MYSQL_USER}
-      DB_PASSWORD: ${MYSQL_PASSWORD}
-      ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL}
-      ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
-      PUBLIC_URL: ${DIRECTUS_PUBLIC_URL}
-      CORS_ENABLED: "true"
-      CORS_ORIGIN: "true"
-    volumes:
-      - directus_uploads:/directus/uploads
-      - ./directus/snapshots:/directus/snapshots
-    ports:
-      - "8055:8055"
-
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: simply-cupboards-phpmyadmin
@@ -64,4 +36,3 @@ services:
 
 volumes:
   mysql_data:
-  directus_uploads:
