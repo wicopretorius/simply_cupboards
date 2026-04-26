@@ -2,57 +2,116 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Commands
+## Project overview
 
+Simply Cupboards — a mobile-first kitchen cabinet design app. Originally a Figma Make export (React + Vite, `src/`), being migrated to Next.js 15 (`app/`) with Directus as the headless CMS backend.
+
+Temporary domains (until simplycupboards.com is purchased):
+- App: `cupboards.jirehsoft.com`
+- Directus API: `api-cupboards.jirehsoft.com`
+
+---
+
+## Local development
+
+### Prerequisites
+- Docker (for MySQL + Directus + phpMyAdmin)
+- Node.js (any version for Next.js dev)
+
+### Start backend services
 ```bash
-pnpm install      # install dependencies
-pnpm run dev      # start dev server (Vite)
-pnpm run build    # production build
+docker compose up -d        # MySQL :3307, Directus :8055, phpMyAdmin :8081
+docker compose down         # stop all
+docker compose logs -f directus   # tail Directus logs
 ```
 
-There is no test runner or linter configured in this project.
+### Next.js app
+```bash
+cd app
+npm install
+npm run dev                 # http://localhost:3000
+npm run build
+```
+
+### Directus (local)
+Running at `http://localhost:8055`
+- Admin: `cupboards@jirehsoft.com` / `admin_password_123`
+- phpMyAdmin: `http://localhost:8081`
+
+### Directus schema workflow
+After changing the data model in the Directus UI, snapshot and commit it:
+```bash
+docker exec simply-cupboards-directus \
+  npx directus schema snapshot /directus/snapshots/snapshot-$(date +%Y%m%d).yaml --yes
+git add directus/snapshots/ && git commit -m "chore: update Directus schema snapshot"
+```
+
+---
+
+## Production (HestiaCP VPS)
+
+Directus and Next.js run as native Node.js processes via PM2. **No Docker on the VPS** — too resource-constrained (4GB RAM, 2 vCPU) with WordPress sites co-hosted.
+
+- MySQL: HestiaCP built-in (port 3306)
+- Node.js: must be **v20 LTS** (see `.nvmrc`) — v25 breaks `isolated-vm` (Directus native module)
+
+### First-time deploy
+```bash
+git clone https://github.com/wicopretorius/simply_cupboards.git
+cd simply_cupboards
+
+# Directus
+cd directus
+cp .env.example .env        # fill in HestiaCP MySQL creds + production URLs
+npm install
+npm run bootstrap           # creates DB tables + admin user
+
+# Next.js
+cd ../app
+cp .env.example .env.local  # set NEXT_PUBLIC_DIRECTUS_URL=https://api-cupboards.jirehsoft.com
+npm install
+npm run build
+
+# Start both with PM2
+cd ..
+pm2 start ecosystem.config.js
+pm2 save && pm2 startup
+```
+
+### Apply schema on deploy
+```bash
+git pull
+cd directus
+node_modules/.bin/directus schema apply ./snapshots/$(ls snapshots | sort | tail -1) --yes
+pm2 restart simply-cupboards-directus
+```
+
+### PM2 process names
+- `simply-cupboards-directus` — Directus on port 8055
+- `simply-cupboards-app` — Next.js on port 3000
+
+### HestiaCP nginx proxy config
+Point each domain to the local port:
+- `cupboards.jirehsoft.com` → `127.0.0.1:3000`
+- `api-cupboards.jirehsoft.com` → `127.0.0.1:8055`
+
+---
 
 ## Architecture
 
-This is a **Figma Make** export — a mobile-first React app (390×844px viewport) for designing kitchen cupboard layouts. It is a single-page app with client-side screen routing; there is no backend, router library, or external data fetching.
+### Stack
+- **Frontend**: Next.js 15, App Router, TypeScript, Tailwind CSS
+- **Backend**: Directus 11.17.3 (headless CMS + REST/GraphQL API)
+- **Database**: MySQL 8.0
+- **Directus SDK**: `app/src/lib/directus.ts` — singleton client using `NEXT_PUBLIC_DIRECTUS_URL`
 
-### Screen routing
+### Original Figma export (legacy, `src/`)
+The original Vite/React SPA remains in `src/` as reference during migration. It is a mobile-first app (390×844px viewport) with:
 
-`App.tsx` owns all shared state and renders one screen at a time via a `screen` string state variable (`"login" | "discover" | "floorplan" | "wallview" | "profile"`). `BottomNav` (from `SharedUI`) drives navigation between screens after login. Each screen component receives `onNavigate` and whatever slice of state it needs — there is no context or global store.
+- **Screen routing**: `src/app/App.tsx` owns all state, renders one screen at a time via a `screen` string (`"login" | "discover" | "floorplan" | "wallview" | "profile"`). No router library.
+- **State model**: `AppDesign` holds `baseCabinets`/`upperCabinets` (`PlacedCabinet[]`). `PlacedCabinet` wraps a `PaletteItem` from the static `PALETTE` map. `WALL_MM = 4200` is the mm reference used to compute pixel widths. `FloorFixture` positions are stored as x/y percentages.
+- **DnD in WallView**: Custom pointer-event drag-and-drop (no library). 8px activation threshold, insertion index computed from DOM rect measurement.
+- **Styling**: Inline `style` objects, hardcoded dark palette (`#C8A96E` gold, `#0F0F0E` bg, `#F2EDE6` text, `#6A6560` muted, `#E05C5C` error). The `src/app/components/ui/` shadcn components and MUI are installed but unused.
 
-### State model (`src/app/types.ts` + `src/app/data.ts`)
-
-- **`AppDesign`** — a named design project; holds `baseCabinets` and `upperCabinets` arrays of `PlacedCabinet`. Multiple designs live in `App.tsx`'s `designs` array; `activeDesignId` tracks which one the wall editor is working on.
-- **`PlacedCabinet`** — a unique instance (`instanceId` from `uid()`) wrapping a `PaletteItem` catalog entry.
-- **`PaletteItem`** — a cabinet type from the static `PALETTE` map keyed by `CabinetTab`. Width is always in millimetres; `WALL_MM = 4200` is the reference wall length used to compute pixel widths.
-- **`FloorFixture`** — a door/window/basin/stove placed on the floor plan, stored as `x/y` percentages.
-
-Mutations to `baseCabinets`/`upperCabinets` go through `setBaseCabinets`/`setUpperCabinets` helpers in `App.tsx`, which update the correct `AppDesign` inside the `designs` array and stamp `badge: "In Progress"`.
-
-### Screen components (`src/app/components/`)
-
-| File | Responsibility |
-|---|---|
-| `Login.tsx` | Email/password login form; calls `onLogin` on submit |
-| `Discover.tsx` | Lists `AppDesign` cards; entry point after login |
-| `FloorPlan.tsx` | 2-D room canvas with tool chips (Wall/Door/Window/Basin/Stove/Measure); places `FloorFixture` objects by click position as % of canvas |
-| `WallView.tsx` | Main cabinet editor; drag-from-palette and drag-to-reorder using raw Pointer Events (not a DnD library) |
-| `Profile.tsx` | User profile and design list |
-| `SharedUI.tsx` | Shared primitives: `StatusBar`, `AppHeader`, `BottomNav`, `IconBtn`, and all inline SVG icons |
-
-### Drag-and-drop in WallView
-
-`WallView.tsx` implements its own pointer-event DnD without react-dnd. A `DragState` ref (`dragRef`) is updated in `window` `pointermove`/`pointerup` handlers. The drag activates after an 8px threshold. Drop position is computed by measuring the `baseRowRef`/`upperRowRef` DOM rects and finding the insertion index from the pointer X coordinate. A `DropIndicator` renders at the computed index while dragging.
-
-### Styling conventions
-
-All app UI uses **inline `style` objects** with hardcoded dark-theme color values — not Tailwind or CSS modules. The palette is:
-- `#C8A96E` — gold accent / selection
-- `#0F0F0E` / `#1A1917` / `#242220` — dark backgrounds
-- `#F2EDE6` — primary text
-- `#6A6560` — muted text
-- `#E05C5C` — error / delete
-
-The `src/app/components/ui/` directory contains a full **shadcn/ui** component library (Radix-based) plus MUI (`@mui/material`) — both are installed but **not used** by the app screens. `src/styles/theme.css` holds shadcn CSS variables. Do not use these for new app UI; follow the inline-style pattern used by the existing screens.
-
-`vite.config.ts` registers a `figma:asset/` import alias that resolves to `src/assets/` — use this prefix when importing Figma-exported assets.
+### Next.js app (`app/`)
+Migration in progress. New screens go in `app/src/app/` using the App Router. Data fetching via the Directus SDK client in `app/src/lib/directus.ts`.

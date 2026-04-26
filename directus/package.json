@@ -1,0 +1,13 @@
+{
+  "name": "simply-cupboards-directus",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "directus start",
+    "bootstrap": "directus bootstrap",
+    "snapshot": "directus schema snapshot ./snapshots/snapshot-$(date +%Y%m%d).yaml --yes",
+    "apply": "directus schema apply ./snapshots/$(ls snapshots | sort | tail -1) --yes"
+  },
+  "dependencies": {
+    "directus": "11.17.3"
+  }
+}

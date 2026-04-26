@@ -14,5 +14,8 @@ app/out/
 app/.env.local
 app/node_modules/
 
-# Directus uploads (committed via snapshots only)
+# Directus — uploads and secrets not committed
+directus/.env
 directus/uploads/
+directus/extensions/
+directus/node_modules/
