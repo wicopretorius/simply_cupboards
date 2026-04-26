@@ -111,13 +111,14 @@ Point each domain to the local port:
 - **Database**: MySQL 8.0
 - **Directus SDK**: `app/src/lib/directus.ts` — singleton client using `NEXT_PUBLIC_DIRECTUS_URL`
 
-### Original Figma export (legacy, `src/`)
-The original Vite/React SPA remains in `src/` as reference during migration. It is a mobile-first app (390×844px viewport) with:
+### UI design reference
 
-- **Screen routing**: `src/app/App.tsx` owns all state, renders one screen at a time via a `screen` string (`"login" | "discover" | "floorplan" | "wallview" | "profile"`). No router library.
-- **State model**: `AppDesign` holds `baseCabinets`/`upperCabinets` (`PlacedCabinet[]`). `PlacedCabinet` wraps a `PaletteItem` from the static `PALETTE` map. `WALL_MM = 4200` is the mm reference used to compute pixel widths. `FloorFixture` positions are stored as x/y percentages.
-- **DnD in WallView**: Custom pointer-event drag-and-drop (no library). 8px activation threshold, insertion index computed from DOM rect measurement.
-- **Styling**: Inline `style` objects, hardcoded dark palette (`#C8A96E` gold, `#0F0F0E` bg, `#F2EDE6` text, `#6A6560` muted, `#E05C5C` error). The `src/app/components/ui/` shadcn components and MUI are installed but unused.
+The original app was a mobile-first SPA (390×844px viewport). Key patterns to carry into Next.js:
+
+- **5 screens**: login → discover → floorplan → wallview → profile
+- **Dark colour palette**: `#C8A96E` gold accent, `#0F0F0E`/`#1A1917`/`#242220` backgrounds, `#F2EDE6` text, `#6A6560` muted, `#E05C5C` error/delete
+- **WallView DnD**: custom pointer-event drag (8px threshold), insertion index from DOM rect — no DnD library
+- **WALL_MM = 4200**: reference wall width in mm; cabinet pixel widths are `(widthMm / 4200) * containerPx`
 
 ### Next.js app (`app/`)
-Migration in progress. New screens go in `app/src/app/` using the App Router. Data fetching via the Directus SDK client in `app/src/lib/directus.ts`.
+New screens go in `app/src/app/` using the App Router. Data fetching via the Directus SDK client in `app/src/lib/directus.ts`.
