@@ -1,18 +1,18 @@
 'use client'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { directus } from '@/lib/directus'
 import { readItem, readItems, createItem, updateItem, deleteItem } from '@directus/sdk'
-import type { Design, FloorFixture, PaletteItem } from '@/lib/types'
+import type { Design, FloorFixture, PaletteItem, WallDef } from '@/lib/types'
 import { StatusBar, BottomNav, AppHeader, Spinner, TrashIcon } from './SharedUI'
 
-const DEPTH_MM      = 3000
-const CAB_BASE_D    = 600
-const CAB_UPPER_D   = 300
-const SVG_W         = 350
+const SVG_W      = 350
+const FALLBACK_D = 3000   // mm depth when no room_shape
+const CAB_BASE_D = 600
+const CAB_UPPER_D = 300
+const PAD        = 8      // SVG padding in px
 
 type FType = FloorFixture['type']
-
 interface LFix { dbId: number | null; iid: string; type: FType; x: number; y: number }
 
 const uid = () => Math.random().toString(36).slice(2, 9)
@@ -33,11 +33,61 @@ const LBL: Record<FType, string> = {
   door: 'Door', window: 'Window', basin: 'Basin', stove: 'Stove',
 }
 
+// ── Geometry ─────────────────────────────────────────────────────────────────
+
+interface RoomGeometry {
+  sc:        number    // px per mm
+  svgH:      number    // SVG height in px
+  offX:      number    // x offset to centre room in SVG
+  offY:      number    // y offset
+  bboxW:     number    // room bounding box width in mm
+  bboxH:     number    // room bounding box height in mm
+  polyPts:   string    // SVG points string for room polygon
+  hasShape:  boolean
+}
+
+function computeGeometry(walls: WallDef[] | undefined, wallMm: number): RoomGeometry {
+  if (!walls || walls.length === 0) {
+    // Rectangle fallback
+    const sc    = (SVG_W - PAD * 2) / wallMm
+    const svgH  = Math.round(FALLBACK_D * sc + PAD * 2)
+    const polyPts = `${PAD},${PAD} ${SVG_W - PAD},${PAD} ${SVG_W - PAD},${svgH - PAD} ${PAD},${svgH - PAD}`
+    return { sc, svgH, offX: PAD, offY: PAD, bboxW: wallMm, bboxH: FALLBACK_D, polyPts, hasShape: false }
+  }
+
+  // Compute vertices from wall definitions
+  const pts: { x: number; y: number }[] = [{ x: 0, y: 0 }]
+  for (const w of walls) {
+    const prev = pts[pts.length - 1]
+    const rad  = (w.angleDeg * Math.PI) / 180
+    pts.push({ x: prev.x + w.lengthMm * Math.cos(rad), y: prev.y - w.lengthMm * Math.sin(rad) })
+  }
+
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y)
+  const minX = Math.min(...xs), maxX = Math.max(...xs)
+  const minY = Math.min(...ys), maxY = Math.max(...ys)
+  const bboxW = maxX - minX || 1000
+  const bboxH = maxY - minY || 1000
+
+  const sc   = Math.min((SVG_W - PAD * 2) / bboxW, (SVG_W - PAD * 2) / bboxH)
+  const svgH = Math.round(bboxH * sc + PAD * 2)
+  const offX = PAD + ((SVG_W - PAD * 2) - bboxW * sc) / 2
+  const offY = PAD + ((svgH  - PAD * 2) - bboxH * sc) / 2
+
+  const polyPts = pts.map(p =>
+    `${offX + (p.x - minX) * sc},${offY + (p.y - minY) * sc}`
+  ).join(' ')
+
+  return { sc, svgH, offX, offY, bboxW, bboxH, polyPts, hasShape: true }
+}
+
 function toSvgPt(svg: SVGSVGElement, clientX: number, clientY: number) {
   const pt = svg.createSVGPoint()
   pt.x = clientX; pt.y = clientY
   return pt.matrixTransform(svg.getScreenCTM()!.inverse())
 }
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function FloorPlan({ designId }: { designId: number }) {
   const router   = useRouter()
@@ -55,9 +105,10 @@ export default function FloorPlan({ designId }: { designId: number }) {
 
   fixRef.current = fixes
 
-  const wallMm = design?.wall_mm ?? 4200
-  const SC     = SVG_W / wallMm
-  const SVG_H  = Math.round(DEPTH_MM * SC)
+  const geo = useMemo(() =>
+    computeGeometry(design?.room_shape?.walls, design?.wall_mm ?? 4200),
+    [design]
+  )
 
   // ── Load ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -93,8 +144,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
     const [fw, fh] = SZ[addType]
     const fix: LFix = {
       dbId: null, iid: uid(), type: addType,
-      x: Math.max(0, (wallMm - fw) / 2),
-      y: Math.max(0, (DEPTH_MM - fh) / 2),
+      x: Math.max(0, (geo.bboxW - fw) / 2),
+      y: Math.max(0, (geo.bboxH - fh) / 2),
     }
     setFixes(p => [...p, fix])
     setSel(fix.iid)
@@ -102,7 +153,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
     directus.request(createItem('floor_fixtures', { design_id: designId, type: addType, x: fix.x, y: fix.y }))
       .then(r => setFixes(p => p.map(f => f.iid === fix.iid ? { ...f, dbId: (r as FloorFixture).id } : f)))
       .finally(() => setSaving(false))
-  }, [addType, designId, wallMm])
+  }, [addType, designId, geo])
 
   // ── Delete selected ───────────────────────────────────────────────────────
   const removeSel = useCallback(() => {
@@ -123,16 +174,17 @@ export default function FloorPlan({ designId }: { designId: number }) {
     const sp  = toSvgPt(svg, e.clientX, e.clientY)
     const fx0 = fixRef.current.find(f => f.iid === iid)!
     const [fw, fh] = SZ[fx0.type]
+    const { sc, bboxW, bboxH } = geo
     let moved = false
 
     const onMove = (ev: PointerEvent) => {
       const cp  = toSvgPt(svg, ev.clientX, ev.clientY)
-      const dmx = (cp.x - sp.x) / SC
-      const dmy = (cp.y - sp.y) / SC
+      const dmx = (cp.x - sp.x) / sc
+      const dmy = (cp.y - sp.y) / sc
       if (!moved && Math.hypot(dmx, dmy) < 5) return
       moved = true
-      const nx = Math.max(0, Math.min(wallMm - fw, fx0.x + dmx))
-      const ny = Math.max(0, Math.min(DEPTH_MM - fh, fx0.y + dmy))
+      const nx = Math.max(0, Math.min(bboxW - fw, fx0.x + dmx))
+      const ny = Math.max(0, Math.min(bboxH - fh, fx0.y + dmy))
       setFixes(p => p.map(f => f.iid === iid ? { ...f, x: nx, y: ny } : f))
     }
 
@@ -150,17 +202,25 @@ export default function FloorPlan({ designId }: { designId: number }) {
 
     el.addEventListener('pointermove', onMove as EventListener)
     el.addEventListener('pointerup', onUp)
-  }, [SC, wallMm])
+  }, [geo])
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return <><StatusBar /><Spinner /><BottomNav designId={designId} /></>
+
+  const { sc, svgH, offX, offY, bboxW, bboxH, polyPts, hasShape } = geo
+  const wallMm = design?.wall_mm ?? 4200
+
+  // Convert mm coordinates to SVG px
+  const mmToSvg = (x: number, y: number) => ({ x: offX + x * sc, y: offY + y * sc })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       <StatusBar />
       <AppHeader
         title={design?.name ?? 'Floor Plan'}
-        subtitle={`${(wallMm / 1000).toFixed(1)}m × ${(DEPTH_MM / 1000).toFixed(1)}m`}
+        subtitle={hasShape
+          ? `${(bboxW / 1000).toFixed(1)}m × ${(bboxH / 1000).toFixed(1)}m`
+          : `${(wallMm / 1000).toFixed(1)}m × ${(FALLBACK_D / 1000).toFixed(1)}m (default)`}
         onBack={() => router.push(`/wall-view/${designId}`)}
         actions={saving
           ? <span style={{ fontSize: 11, color: '#C8A96E', marginRight: 4 }}>Saving…</span>
@@ -173,91 +233,89 @@ export default function FloorPlan({ designId }: { designId: number }) {
         <div style={{ background: '#1A1917', borderRadius: 12, overflow: 'hidden', border: '1px solid #2A2825' }}>
           <svg
             ref={svgRef}
-            width={SVG_W}
-            height={SVG_H}
+            viewBox={`0 0 ${SVG_W} ${svgH}`}
             style={{ display: 'block', width: '100%', height: 'auto' }}
             onClick={() => setSel(null)}
           >
-            {/* room fill */}
-            <rect x={0} y={0} width={SVG_W} height={SVG_H} fill="#0F0F0E" />
+            {/* Room fill */}
+            <polygon points={polyPts} fill="#0F0F0E" />
 
-            {/* upper cabinets – top wall, dashed */}
+            {/* Upper cabinets – dashed along top of room (first wall for polygon, top edge for rect) */}
             {(() => {
               let cx = 0
               return uppers.map((wm, i) => {
-                const px = cx * SC, pw = wm * SC, ph = CAB_UPPER_D * SC
+                const p1 = mmToSvg(cx, 0), p2 = mmToSvg(cx + wm, 0)
+                const ph = CAB_UPPER_D * sc
                 cx += wm
-                return <rect key={i} x={px} y={0} width={pw} height={ph}
+                return <rect key={i} x={p1.x} y={p1.y} width={Math.abs(p2.x - p1.x)} height={ph}
                   fill="rgba(42,40,37,0.9)" stroke="#3A3835" strokeWidth={1} strokeDasharray="4 2" />
               })
             })()}
 
-            {/* base cabinets – bottom wall */}
+            {/* Base cabinets – solid along bottom of room */}
             {(() => {
               let cx = 0
               return bases.map((wm, i) => {
-                const px = cx * SC, pw = wm * SC, ph = CAB_BASE_D * SC
+                const p1 = mmToSvg(cx, bboxH - CAB_BASE_D)
+                const ph = CAB_BASE_D * sc, pw = wm * sc
                 cx += wm
-                return <rect key={i} x={px} y={SVG_H - ph} width={pw} height={ph}
+                return <rect key={i} x={p1.x} y={p1.y} width={pw} height={ph}
                   fill="#2A2825" stroke="#3A3835" strokeWidth={1} />
               })
             })()}
 
-            {/* room outline */}
-            <rect x={0} y={0} width={SVG_W} height={SVG_H} fill="none" stroke="#5A5550" strokeWidth={2} />
+            {/* Room outline */}
+            <polygon points={polyPts} fill="none" stroke="#5A5550" strokeWidth={2} strokeLinejoin="round" />
 
-            {/* dimension labels */}
-            <text x={SVG_W / 2} y={14} textAnchor="middle" fontSize={9} fill="#4A4845">
-              {(wallMm / 1000).toFixed(1)}m
+            {/* Dimension labels */}
+            <text x={SVG_W / 2} y={12} textAnchor="middle" fontSize={9} fill="#4A4845">
+              {(bboxW / 1000).toFixed(1)}m
             </text>
-            <text x={SVG_W - 6} y={SVG_H / 2} textAnchor="middle" fontSize={9} fill="#4A4845"
-              transform={`rotate(-90,${SVG_W - 6},${SVG_H / 2})`}>
-              {(DEPTH_MM / 1000).toFixed(1)}m
+            <text x={SVG_W - 6} y={svgH / 2} textAnchor="middle" fontSize={9} fill="#4A4845"
+              transform={`rotate(-90,${SVG_W - 6},${svgH / 2})`}>
+              {(bboxH / 1000).toFixed(1)}m
             </text>
 
-            {/* fixtures */}
+            {/* Fixtures */}
             {fixes.map(fx => {
               const [fw, fh] = SZ[fx.type]
-              const px = fx.x * SC, py = fx.y * SC
-              const pw = fw * SC, ph = fh * SC
+              const sp = mmToSvg(fx.x, fx.y)
+              const pw = fw * sc, ph = fh * sc
               const isSelected = sel === fx.iid
               return (
                 <g key={fx.iid}>
                   <rect
-                    x={px} y={py} width={pw} height={ph}
+                    x={sp.x} y={sp.y} width={pw} height={ph}
                     fill={CLR[fx.type]} rx={3}
                     stroke={isSelected ? '#F2EDE6' : 'transparent'}
                     strokeWidth={isSelected ? 1.5 : 0}
                     style={{ cursor: 'grab', touchAction: 'none' }}
                     onPointerDown={e => handlePointerDown(e, fx.iid)}
                   />
-                  {/* fixture detail marks */}
                   {fx.type === 'stove' && [0, 1, 2, 3].map(i => (
                     <circle key={i}
-                      cx={px + (i % 2 === 0 ? 0.28 : 0.72) * pw}
-                      cy={py + (i < 2 ? 0.3 : 0.7) * ph}
-                      r={Math.min(pw, ph) * 0.11}
-                      fill="rgba(0,0,0,0.25)"
-                      style={{ pointerEvents: 'none' }}
-                    />
+                      cx={sp.x + (i % 2 === 0 ? 0.28 : 0.72) * pw}
+                      cy={sp.y + (i < 2 ? 0.3 : 0.7) * ph}
+                      r={Math.min(pw, ph) * 0.11} fill="rgba(0,0,0,0.25)"
+                      style={{ pointerEvents: 'none' }} />
                   ))}
                   {fx.type === 'basin' && (
-                    <ellipse cx={px + pw / 2} cy={py + ph / 2} rx={pw * 0.35} ry={ph * 0.3}
+                    <ellipse cx={sp.x + pw / 2} cy={sp.y + ph / 2} rx={pw * 0.35} ry={ph * 0.3}
                       fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth={1}
                       style={{ pointerEvents: 'none' }} />
                   )}
                   {fx.type === 'door' && (
                     <path
-                      d={`M ${px + pw * 0.05} ${py + ph * 0.95} A ${pw * 0.85} ${ph * 0.85} 0 0 1 ${px + pw * 0.95} ${py + ph * 0.05}`}
+                      d={`M ${sp.x + pw * 0.05} ${sp.y + ph * 0.95} A ${pw * 0.85} ${ph * 0.85} 0 0 1 ${sp.x + pw * 0.95} ${sp.y + ph * 0.05}`}
                       fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth={1}
                       style={{ pointerEvents: 'none' }} />
                   )}
                   {fx.type === 'window' && (
-                    <line x1={px + pw * 0.1} y1={py + ph / 2} x2={px + pw * 0.9} y2={py + ph / 2}
+                    <line x1={sp.x + pw * 0.1} y1={sp.y + ph / 2} x2={sp.x + pw * 0.9} y2={sp.y + ph / 2}
                       stroke="rgba(0,0,0,0.3)" strokeWidth={1.5}
                       style={{ pointerEvents: 'none' }} />
                   )}
-                  <text x={px + pw / 2} y={py + ph / 2 + 4} textAnchor="middle"
+                  <text x={sp.x + pw / 2} y={sp.y + ph / 2 + 4} textAnchor="middle"
                     fontSize={Math.max(8, Math.min(11, ph * 0.18))} fill="#0F0F0E" fontWeight="600"
                     style={{ pointerEvents: 'none', userSelect: 'none' }}>
                     {LBL[fx.type]}
@@ -267,8 +325,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
             })}
           </svg>
 
-          {/* legend */}
-          <div style={{ padding: '8px 12px', borderTop: '1px solid #2A2825', display: 'flex', gap: 16 }}>
+          {/* Legend */}
+          <div style={{ padding: '8px 12px', borderTop: '1px solid #2A2825', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 16, height: 10, background: '#2A2825', border: '1px solid #3A3835' }} />
               <span style={{ fontSize: 10, color: '#6A6560' }}>Base</span>
@@ -277,6 +335,14 @@ export default function FloorPlan({ designId }: { designId: number }) {
               <div style={{ width: 16, height: 10, background: 'rgba(42,40,37,0.9)', border: '1px dashed #3A3835' }} />
               <span style={{ fontSize: 10, color: '#6A6560' }}>Upper (overhead)</span>
             </div>
+            {!hasShape && (
+              <button
+                onClick={() => router.push(`/room-setup/${designId}`)}
+                style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#C8A96E', fontSize: 10, fontWeight: 600 }}
+              >
+                Edit room shape →
+              </button>
+            )}
           </div>
         </div>
 
@@ -286,7 +352,6 @@ export default function FloorPlan({ designId }: { designId: number }) {
             textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Add Fixture
           </div>
-
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             {(['door', 'window', 'basin', 'stove'] as FType[]).map(t => (
               <button key={t} onClick={() => setAddType(t)} style={{
@@ -299,7 +364,6 @@ export default function FloorPlan({ designId }: { designId: number }) {
               </button>
             ))}
           </div>
-
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={addFixture} style={{
               flex: 1, padding: '11px 0', borderRadius: 10, border: 'none',
@@ -318,7 +382,6 @@ export default function FloorPlan({ designId }: { designId: number }) {
               </button>
             )}
           </div>
-
           {sel && (
             <p style={{ fontSize: 11, color: '#6A6560', marginTop: 8, textAlign: 'center' }}>
               Drag fixture to reposition · tap trash to remove

@@ -12,12 +12,23 @@ export interface PaletteItem {
   tab: CabinetTab
 }
 
+export interface WallDef {
+  id: string
+  lengthMm: number
+  angleDeg: number  // absolute direction: 0=right, 90=up, 180=left, 270=down
+}
+
+export interface RoomDef {
+  walls: WallDef[]
+}
+
 export interface Design {
   id: number
   name: string
   subtitle: string
   badge: 'In Progress' | 'Complete' | 'Draft'
   wall_mm: number
+  room_shape?: RoomDef | null
   placed_cabinets?: PlacedCabinet[]
   floor_fixtures?: FloorFixture[]
   date_created?: string

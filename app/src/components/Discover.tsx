@@ -13,6 +13,8 @@ export default function Discover() {
   const [userEmail, setUserEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [showDialog, setShowDialog] = useState(false)
+  const [newName, setNewName]   = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -35,16 +37,20 @@ export default function Discover() {
     load()
   }, [router])
 
+  const openDialog = () => { setNewName(''); setShowDialog(true) }
+
   const createDesign = async () => {
+    const name = newName.trim() || 'New Design'
+    setShowDialog(false)
     setCreating(true)
     try {
       const design = await directus.request(createItem('designs', {
-        name: 'New Design',
-        subtitle: 'Untitled · 4.2m wide',
+        name,
+        subtitle: 'Draft · no room yet',
         badge: 'Draft',
         wall_mm: 4200,
       }))
-      router.push(`/wall-view/${(design as Design).id}`)
+      router.push(`/room-setup/${(design as Design).id}`)
     } finally {
       setCreating(false)
     }
@@ -74,7 +80,7 @@ export default function Discover() {
       <div style={{ padding: '16px 20px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 700, color: '#F2EDE6' }}>My Designs</div>
         <button
-          onClick={createDesign}
+          onClick={openDialog}
           disabled={creating}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
@@ -153,6 +159,70 @@ export default function Discover() {
       </div>
 
       <BottomNav />
+
+      {/* Name dialog */}
+      {showDialog && (
+        <div
+          onClick={() => setShowDialog(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex', alignItems: 'flex-end',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', background: '#1A1917',
+              borderRadius: '20px 20px 0 0',
+              padding: '24px 24px 44px',
+            }}
+          >
+            <div style={{ fontSize: 17, fontWeight: 700, color: '#F2EDE6', marginBottom: 20 }}>
+              New Design
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+              Design Name
+            </div>
+            <input
+              autoFocus
+              type="text"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createDesign()}
+              placeholder="e.g. Kitchen Remodel"
+              style={{
+                width: '100%', padding: '13px 14px', borderRadius: 12,
+                background: '#0F0F0E', border: '1px solid #3A3835',
+                color: '#F2EDE6', fontSize: 15, outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <button
+                onClick={() => setShowDialog(false)}
+                style={{
+                  flex: 1, padding: '13px 0', borderRadius: 12,
+                  background: '#242220', border: '1px solid #3A3835',
+                  color: '#6A6560', fontSize: 14, fontWeight: 600,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createDesign}
+                style={{
+                  flex: 2, padding: '13px 0', borderRadius: 12, border: 'none',
+                  background: 'linear-gradient(135deg,#C8A96E,#A07840)',
+                  color: '#0F0F0E', fontSize: 14, fontWeight: 700,
+                }}
+              >
+                Create &amp; Design →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
