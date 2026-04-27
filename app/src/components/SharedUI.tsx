@@ -121,16 +121,16 @@ export const AppHeader = ({
   </div>
 )
 
-const NAV_ITEMS = [
-  { href: '/discover',   icon: <HomeIcon />,  label: 'Home'    },
-  { href: '/floor-plan', icon: <GridIcon />,  label: 'Plan'    },
-  { href: '/wall-view',  icon: <PlusIcon />,  label: 'Design'  },
-  { href: '/profile',    icon: <UserIcon />,  label: 'Profile' },
-]
-
-export const BottomNav = () => {
+export const BottomNav = ({ designId }: { designId?: number } = {}) => {
   const pathname = usePathname()
   const router   = useRouter()
+
+  const navItems = [
+    { base: '/discover',   href: '/discover',                                     icon: <HomeIcon />, label: 'Home'    },
+    { base: '/floor-plan', href: designId ? `/floor-plan/${designId}` : '/floor-plan', icon: <GridIcon />, label: 'Plan'    },
+    { base: '/wall-view',  href: designId ? `/wall-view/${designId}`  : '/wall-view',  icon: <PlusIcon />, label: 'Design'  },
+    { base: '/profile',    href: '/profile',                                      icon: <UserIcon />, label: 'Profile' },
+  ]
 
   return (
     <div style={{
@@ -138,11 +138,11 @@ export const BottomNav = () => {
       display: 'flex', alignItems: 'center', justifyContent: 'space-around',
       background: '#141210', flexShrink: 0, paddingBottom: 8,
     }}>
-      {NAV_ITEMS.map(({ href, icon, label }) => {
-        const active = pathname.startsWith(href)
+      {navItems.map(({ base, href, icon, label }) => {
+        const active = pathname.startsWith(base)
         return (
           <button
-            key={href}
+            key={base}
             onClick={() => router.push(href)}
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,

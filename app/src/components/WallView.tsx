@@ -519,7 +519,7 @@ export default function WallView({ designId }: { designId: number }) {
       </div>
 
       {dragState?.active && <DragGhost item={dragState.item} x={dragState.x} y={dragState.y} />}
-      <BottomNav />
+      <BottomNav designId={designId} />
     </div>
   )
 }
