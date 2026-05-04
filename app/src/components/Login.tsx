@@ -9,6 +9,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
+  const [showPw, setShowPw]     = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -16,7 +17,7 @@ export default function Login() {
     setLoading(true)
     try {
       await directus.login({ email, password })
-      router.replace('/discover')
+      router.replace('/designs')
     } catch {
       setError('Invalid email or password.')
     } finally {
@@ -46,7 +47,7 @@ export default function Login() {
           </svg>
         </div>
         <div style={{ fontSize: 22, fontWeight: 700, color: '#F2EDE6', marginBottom: 6 }}>
-          Simply Cupboards
+          DM Cupboards
         </div>
         <div style={{ fontSize: 13, color: '#6A6560' }}>
           Design your dream kitchen
@@ -73,14 +74,38 @@ export default function Login() {
           <label style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
             Password
           </label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            style={inp}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPw ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              style={{ ...inp, paddingRight: 48 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw(p => !p)}
+              style={{
+                position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', padding: 4, cursor: 'pointer',
+                color: '#6A6560', display: 'flex', alignItems: 'center',
+              }}
+            >
+              {showPw ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -128,7 +153,7 @@ export default function Login() {
       </div>
 
       {/* Footer */}
-      <div style={{ marginTop: 'auto', paddingBottom: 40, textAlign: 'center' }}>
+      <div style={{ marginTop: 24, paddingBottom: 40, textAlign: 'center' }}>
         <span style={{ fontSize: 13, color: '#4A4845' }}>Don't have an account? </span>
         <button style={{ background: 'none', border: 'none', color: '#C8A96E', fontSize: 13, fontWeight: 600 }}>
           Sign up

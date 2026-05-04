@@ -1,5 +1,5 @@
 {
-  "name": "simply-cupboards-directus",
+  "name": "dm-cupboards-directus",
   "version": "1.0.0",
   "scripts": {
     "start": "directus start",

@@ -9,7 +9,7 @@ export default function Home() {
 
   useEffect(() => {
     directus.request(readMe())
-      .then(() => router.replace('/discover'))
+      .then(() => router.replace('/designs'))
       .catch(() => router.replace('/login'))
   }, [router])
 

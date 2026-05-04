@@ -1,6 +1,6 @@
-# Simply Cupboards
+# DM Cupboards
 
-A mobile-first kitchen cabinet design app built with Next.js and Directus.
+Design My Cupboards — a mobile-first kitchen cabinet design app built with Next.js and Directus.
 
 - **App**: `cupboards.jirehsoft.com`
 - **API**: `api-cupboards.jirehsoft.com` (Directus)

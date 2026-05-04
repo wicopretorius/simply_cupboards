@@ -22,12 +22,19 @@ export interface RoomDef {
   walls: WallDef[]
 }
 
+export type RoomType =
+  'kitchen' | 'bathroom' | 'bedroom' | 'livingroom' | 'diningroom' |
+  'garage' | 'laundry' | 'pantry' | 'scullery' | 'study' |
+  'foyer' | 'attic' | 'basement' | 'studio' | 'outbuilding'
+
 export interface Design {
   id: number
   name: string
   subtitle: string
   badge: 'In Progress' | 'Complete' | 'Draft'
   wall_mm: number
+  wall_height_mm: number
+  room_type?: RoomType
   room_shape?: RoomDef | null
   placed_cabinets?: PlacedCabinet[]
   floor_fixtures?: FloorFixture[]
@@ -46,9 +53,14 @@ export interface PlacedCabinet {
 export interface FloorFixture {
   id: number
   design_id: number
-  type: 'door' | 'window' | 'basin' | 'stove'
+  type: 'door' | 'window' | 'sink' | 'basin' | 'stove' | 'oven' | 'socket' | 'light_switch' | 'db_board' | 'drain'
   x: number
   y: number
+  rotation?: number
+  mirrored?: boolean
+  sill_height_mm?: number | null
+  width_mm?: number | null
+  height_mm?: number | null
 }
 
 export interface DirectusSchema {

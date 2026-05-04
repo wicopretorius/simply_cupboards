@@ -23,6 +23,16 @@ export const UserIcon = () => (
     <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
   </svg>
 )
+export const CupboardIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 3h18v18H3z" /><path d="M9 3v18" /><path d="M15 3v18" /><path d="M3 12h18" />
+  </svg>
+)
+export const SaveIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v13a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+  </svg>
+)
 export const ChevronLeft = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
     <path d="m15 18-6-6 6-6"/>
@@ -126,18 +136,25 @@ export const BottomNav = ({ designId }: { designId?: number } = {}) => {
   const router   = useRouter()
 
   const navItems = [
-    { base: '/discover',   href: '/discover',                                     icon: <HomeIcon />, label: 'Home'    },
-    { base: '/floor-plan', href: designId ? `/floor-plan/${designId}` : '/floor-plan', icon: <GridIcon />, label: 'Plan'    },
-    { base: '/wall-view',  href: designId ? `/wall-view/${designId}`  : '/wall-view',  icon: <PlusIcon />, label: 'Design'  },
+    { base: '/designs',   href: '/designs',                                     icon: <HomeIcon />, label: 'Designs'    },
+    { base: '/floor-plan', href: designId ? `/floor-plan/${designId}` : '/floor-plan', icon: <GridIcon />, label: 'Floorplan' },
+    { base: '/wall-view',  href: designId ? `/wall-view/${designId}`  : '/wall-view',  icon: <CupboardIcon />, label: 'Cupboards'  },
     { base: '/profile',    href: '/profile',                                      icon: <UserIcon />, label: 'Profile' },
   ]
 
   return (
-    <div style={{
-      height: 72, borderTop: '1px solid #2A2825',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-      background: '#141210', flexShrink: 0, paddingBottom: 8,
-    }}>
+    <>
+      {/* Spacer so content isn't hidden behind the fixed bar */}
+      <div style={{ height: 72, flexShrink: 0 }} />
+      <div style={{
+        position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+        width: '100%', maxWidth: 390,
+        height: 72, borderTop: '1px solid #2A2825',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+        background: '#141210',
+        paddingBottom: 'env(safe-area-inset-bottom, 8px)',
+        zIndex: 100,
+      }}>
       {navItems.map(({ base, href, icon, label }) => {
         const active = pathname.startsWith(base)
         return (
@@ -156,7 +173,8 @@ export const BottomNav = ({ designId }: { designId?: number } = {}) => {
           </button>
         )
       })}
-    </div>
+      </div>
+    </>
   )
 }
 

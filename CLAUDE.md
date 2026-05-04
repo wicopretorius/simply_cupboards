@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Simply Cupboards — a mobile-first kitchen cabinet design app. Originally a Figma Make export (React + Vite, `src/`), being migrated to Next.js 15 (`app/`) with Directus as the headless CMS backend.
+DM Cupboards (Design My Cupboards) — a mobile-first kitchen cabinet design app. Originally a Figma Make export (React + Vite, `src/`), being migrated to Next.js 15 (`app/`) with Directus as the headless CMS backend.
 
-Temporary domains (until simplycupboards.com is purchased):
+Temporary domains (until dmcupboards.com is purchased):
 - App: `cupboards.jirehsoft.com`
 - Directus API: `api-cupboards.jirehsoft.com`
 
@@ -33,7 +33,7 @@ npm start                   # http://localhost:8055
 # First time only:
 npm run bootstrap           # creates DB tables + admin user
 ```
-- Admin: `cupboards@jirehsoft.com` / `admin_password_123`
+- Admin: `admin@simcup.com` / `admin_123`
 - phpMyAdmin: `http://localhost:8081`
 
 ### Next.js app
@@ -89,12 +89,12 @@ pm2 save && pm2 startup
 git pull
 cd directus
 node_modules/.bin/directus schema apply ./snapshots/$(ls snapshots | sort | tail -1) --yes
-pm2 restart simply-cupboards-directus
+pm2 restart dm-cupboards-directus
 ```
 
 ### PM2 process names
-- `simply-cupboards-directus` — Directus on port 8055
-- `simply-cupboards-app` — Next.js on port 3000
+- `dm-cupboards-directus` — Directus on port 8055
+- `dm-cupboards-app` — Next.js on port 3000
 
 ### HestiaCP nginx proxy config
 Point each domain to the local port:

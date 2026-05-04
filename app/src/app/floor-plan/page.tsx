@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { directus } from '@/lib/directus'
 import { readItems, readMe } from '@directus/sdk'
 import type { Design } from '@/lib/types'
-import { StatusBar, BottomNav, Spinner } from '@/components/SharedUI'
+import { BottomNav, Spinner } from '@/components/SharedUI'
 
 export default function FloorPlanIndexPage() {
   const router = useRouter()
@@ -21,11 +21,11 @@ export default function FloorPlanIndexPage() {
       .finally(() => setLoading(false))
   }, [router])
 
-  if (loading) return <><StatusBar /><Spinner /><BottomNav /></>
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <StatusBar />
+
       <div style={{ flex: 1, padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: '#F2EDE6' }}>Floor Plans</div>
         <div style={{ fontSize: 13, color: '#6A6560' }}>Select a design to view its floor plan</div>

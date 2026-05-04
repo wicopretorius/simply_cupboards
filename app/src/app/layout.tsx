@@ -8,8 +8,8 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'Simply Cupboards',
-  description: 'Kitchen cabinet design app',
+  title: 'DM Cupboards',
+  description: 'Design My Cupboards',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -17,13 +17,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={dmSans.className}>
         <div style={{
-          width: 390,
-          minHeight: 844,
+          width: '100%',
+          minHeight: '100dvh',
           background: '#0F0F0E',
           color: '#F2EDE6',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
           position: 'relative',
         }}>
           {children}

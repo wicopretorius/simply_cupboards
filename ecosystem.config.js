@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'simply-cupboards-directus',
+      name: 'dm-cupboards-directus',
       cwd: './directus',
       script: 'node_modules/.bin/directus',
       args: 'start',
@@ -11,7 +11,7 @@ module.exports = {
       env: { NODE_ENV: 'production' },
     },
     {
-      name: 'simply-cupboards-app',
+      name: 'dm-cupboards-app',
       cwd: './app',
       script: 'node_modules/.bin/next',
       args: 'start',

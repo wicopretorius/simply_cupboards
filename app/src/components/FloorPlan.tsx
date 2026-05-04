@@ -4,38 +4,22 @@ import { useRouter } from 'next/navigation'
 import { directus } from '@/lib/directus'
 import { readItem, readItems, createItem, updateItem, deleteItem } from '@directus/sdk'
 import type { Design, FloorFixture, PaletteItem, WallDef } from '@/lib/types'
-import { StatusBar, BottomNav, AppHeader, Spinner, TrashIcon } from './SharedUI'
+import { BottomNav, AppHeader, Spinner, TrashIcon, SaveIcon } from './SharedUI'
 
 const SVG_W      = 350
 const FALLBACK_D = 3000   // mm depth when no room_shape
 const CAB_BASE_D = 600
 const CAB_UPPER_D = 300
-const PAD        = 8      // SVG padding in px
+const PAD        = 24     // SVG padding in px
 
 type FType = FloorFixture['type']
-interface LFix { dbId: number | null; iid: string; type: FType; x: number; y: number }
+interface LFix { dbId: number | null; iid: string; type: FType; x: number; y: number; rotation: number; mirrored: boolean }
 
 const uid = () => Math.random().toString(36).slice(2, 9)
 
-const SZ: Record<FType, [number, number]> = {
-  door:   [800, 800],
-  window: [900, 150],
-  basin:  [500, 400],
-  stove:  [600, 600],
-}
-const CLR: Record<FType, string> = {
-  door:   'rgba(122,168,224,0.85)',
-  window: 'rgba(160,200,160,0.85)',
-  basin:  'rgba(128,192,208,0.85)',
-  stove:  'rgba(224,128,96,0.85)',
-}
-const LBL: Record<FType, string> = {
-  door: 'Door', window: 'Window', basin: 'Basin', stove: 'Stove',
-}
-
 // ── Geometry ─────────────────────────────────────────────────────────────────
 
-interface RoomGeometry {
+export interface RoomGeometry {
   sc:        number    // px per mm
   svgH:      number    // SVG height in px
   offX:      number    // x offset to centre room in SVG
@@ -46,12 +30,12 @@ interface RoomGeometry {
   hasShape:  boolean
 }
 
-function computeGeometry(walls: WallDef[] | undefined, wallMm: number): RoomGeometry {
+export function computeGeometry(walls: WallDef[] | undefined, wallMm: number, svgWidth: number = SVG_W): RoomGeometry {
   if (!walls || walls.length === 0) {
     // Rectangle fallback
-    const sc    = (SVG_W - PAD * 2) / wallMm
+    const sc    = (svgWidth - PAD * 2) / wallMm
     const svgH  = Math.round(FALLBACK_D * sc + PAD * 2)
-    const polyPts = `${PAD},${PAD} ${SVG_W - PAD},${PAD} ${SVG_W - PAD},${svgH - PAD} ${PAD},${svgH - PAD}`
+    const polyPts = `${PAD},${PAD} ${svgWidth - PAD},${PAD} ${svgWidth - PAD},${svgH - PAD} ${PAD},${svgH - PAD}`
     return { sc, svgH, offX: PAD, offY: PAD, bboxW: wallMm, bboxH: FALLBACK_D, polyPts, hasShape: false }
   }
 
@@ -69,9 +53,9 @@ function computeGeometry(walls: WallDef[] | undefined, wallMm: number): RoomGeom
   const bboxW = maxX - minX || 1000
   const bboxH = maxY - minY || 1000
 
-  const sc   = Math.min((SVG_W - PAD * 2) / bboxW, (SVG_W - PAD * 2) / bboxH)
+  const sc   = Math.min((svgWidth - PAD * 2) / bboxW, (svgWidth - PAD * 2) / bboxH)
   const svgH = Math.round(bboxH * sc + PAD * 2)
-  const offX = PAD + ((SVG_W - PAD * 2) - bboxW * sc) / 2
+  const offX = PAD + ((svgWidth - PAD * 2) - bboxW * sc) / 2
   const offY = PAD + ((svgH  - PAD * 2) - bboxH * sc) / 2
 
   const polyPts = pts.map(p =>
@@ -81,10 +65,63 @@ function computeGeometry(walls: WallDef[] | undefined, wallMm: number): RoomGeom
   return { sc, svgH, offX, offY, bboxW, bboxH, polyPts, hasShape: true }
 }
 
-function toSvgPt(svg: SVGSVGElement, clientX: number, clientY: number) {
+export function toSvgPt(svg: SVGSVGElement, clientX: number, clientY: number) {
   const pt = svg.createSVGPoint()
   pt.x = clientX; pt.y = clientY
-  return pt.matrixTransform(svg.getScreenCTM()!.inverse())
+  const ctm = svg.getScreenCTM()
+  if (!ctm) return pt
+  return pt.matrixTransform(ctm.inverse())
+}
+
+// ── Shared Config ────────────────────────────────────────────────────────────
+
+export const SZ: Record<FType, [number, number]> = {
+  door:         [800,  800],
+  window:       [900,  150],
+  sink:         [800,  500],
+  basin:        [500,  400],
+  stove:        [600,  600],
+  oven:         [600,  600],
+  socket:       [100,  80],
+  light_switch: [80,   60],
+  db_board:     [500,  150],
+  drain:        [100,  100],
+}
+export const CLR: Record<FType, string> = {
+  door:         'rgba(200,169,110,0.28)',
+  window:       'rgba(200,169,110,0.28)',
+  sink:         'rgba(200,169,110,0.28)',
+  basin:        'rgba(200,169,110,0.28)',
+  stove:        'rgba(200,169,110,0.28)',
+  oven:         'rgba(200,169,110,0.28)',
+  socket:       'rgba(110,160,200,0.28)',
+  light_switch: 'rgba(110,160,200,0.28)',
+  db_board:     'rgba(110,160,200,0.28)',
+  drain:        'rgba(80,180,200,0.28)',
+}
+export const LBL: Record<FType, string> = {
+  door: 'Door', window: 'Window', sink: 'Sink', basin: 'Basin', stove: 'Stove', oven: 'Oven',
+  socket: 'Socket', light_switch: 'Switch', db_board: 'DB Board', drain: 'Drain',
+}
+
+const ALL_TYPES = Object.keys(SZ) as FType[]
+
+const ROOM_FIXTURES: Partial<Record<string, FType[]>> = {
+  kitchen:    ['door', 'window', 'sink', 'stove', 'oven', 'light_switch', 'socket', 'db_board'],
+  bathroom:   ['door', 'window', 'basin', 'socket', 'light_switch', 'drain'],
+  bedroom:    ['door', 'window', 'socket', 'light_switch'],
+  livingroom: ['door', 'window', 'socket', 'light_switch', 'db_board'],
+  diningroom: ['door', 'window', 'socket', 'light_switch'],
+  garage:     ['door', 'window', 'socket', 'light_switch', 'db_board', 'drain'],
+  laundry:    ['door', 'window', 'basin', 'socket', 'light_switch', 'drain'],
+  pantry:     ['door', 'window', 'basin', 'socket', 'light_switch'],
+  scullery:   ['door', 'window', 'basin', 'stove', 'socket', 'light_switch', 'drain'],
+  study:      ['door', 'window', 'socket', 'light_switch'],
+  foyer:      ['door', 'window', 'socket', 'light_switch'],
+  attic:      ['door', 'window', 'socket', 'light_switch'],
+  basement:   ['door', 'window', 'socket', 'light_switch', 'db_board', 'drain'],
+  studio:     ['door', 'window', 'basin', 'stove', 'socket', 'light_switch'],
+  outbuilding:['door', 'window', 'socket', 'light_switch', 'drain'],
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -92,6 +129,7 @@ function toSvgPt(svg: SVGSVGElement, clientX: number, clientY: number) {
 export default function FloorPlan({ designId }: { designId: number }) {
   const router   = useRouter()
   const svgRef   = useRef<SVGSVGElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const fixRef   = useRef<LFix[]>([])
 
   const [design,  setDesign]  = useState<Design | null>(null)
@@ -99,16 +137,41 @@ export default function FloorPlan({ designId }: { designId: number }) {
   const [uppers,  setUppers]  = useState<number[]>([])
   const [fixes,   setFixes]   = useState<LFix[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving,  setSaving]  = useState(false)
+  const [saving,  setSaving]  = useState<boolean>(false)
   const [sel,     setSel]     = useState<string | null>(null)
+  const draggingRef           = useRef<string | null>(null)
+  const rotHoldTimeout        = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const rotHoldInterval       = useRef<ReturnType<typeof setInterval> | null>(null)
   const [addType, setAddType] = useState<FType>('basin')
+  const [availableH, setAvailableH] = useState(400)
 
   fixRef.current = fixes
 
-  const geo = useMemo(() =>
-    computeGeometry(design?.room_shape?.walls, design?.wall_mm ?? 4200),
-    [design]
-  )
+  // ── Auto-scale to fit ────────────────────────────────────────────────────
+  useEffect(() => {
+    const updateSize = () => {
+      if (!containerRef.current) return
+      // The content area is the flex-1 div. We want to subtract the toolbar height and padding.
+      // Toolbar is ~120px, header ~60px, nav ~70px.
+      // Actually, we can just measure the container's clientHeight.
+      const h = containerRef.current.clientHeight
+      // Estimated fixtures toolbar is 135px, legend 35px, gaps/padding 50px
+      setAvailableH(h - 180) 
+    }
+    updateSize()
+    window.addEventListener('resize', updateSize)
+    return () => window.removeEventListener('resize', updateSize)
+  }, [loading])
+
+  const geo = useMemo(() => {
+    const baseGeo = computeGeometry(design?.room_shape?.walls, design?.wall_mm ?? 4200)
+    // Adjust scale if svgH exceeds availableH
+    if (baseGeo.svgH > availableH && availableH > 100) {
+      const scaleDown = (availableH - PAD * 2) / baseGeo.bboxH
+      return computeGeometry(design?.room_shape?.walls, design?.wall_mm ?? 4200, SVG_W * (scaleDown / baseGeo.sc))
+    }
+    return baseGeo
+  }, [design, availableH])
 
   // ── Load ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -129,7 +192,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
         const arr = cabs as any[]
         setBases(arr.filter(c => c.row === 'base').map(c => (c.palette_item_id as PaletteItem).width_mm))
         setUppers(arr.filter(c => c.row === 'upper').map(c => (c.palette_item_id as PaletteItem).width_mm))
-        setFixes((fxs as FloorFixture[]).map(f => ({ dbId: f.id, iid: uid(), type: f.type, x: f.x, y: f.y })))
+        setFixes((fxs as FloorFixture[]).map(f => ({ dbId: f.id, iid: uid(), type: f.type, x: f.x, y: f.y, rotation: f.rotation ?? 0, mirrored: f.mirrored ?? false })))
       } catch {
         router.replace('/login')
       } finally {
@@ -146,11 +209,13 @@ export default function FloorPlan({ designId }: { designId: number }) {
       dbId: null, iid: uid(), type: addType,
       x: Math.max(0, (geo.bboxW - fw) / 2),
       y: Math.max(0, (geo.bboxH - fh) / 2),
+      rotation: 0,
+      mirrored: false,
     }
     setFixes(p => [...p, fix])
     setSel(fix.iid)
     setSaving(true)
-    directus.request(createItem('floor_fixtures', { design_id: designId, type: addType, x: fix.x, y: fix.y }))
+    directus.request(createItem('floor_fixtures', { design_id: designId, type: addType, x: fix.x, y: fix.y, rotation: 0, mirrored: false }))
       .then(r => setFixes(p => p.map(f => f.iid === fix.iid ? { ...f, dbId: (r as FloorFixture).id } : f)))
       .finally(() => setSaving(false))
   }, [addType, designId, geo])
@@ -164,12 +229,51 @@ export default function FloorPlan({ designId }: { designId: number }) {
     if (fx.dbId) directus.request(deleteItem('floor_fixtures', fx.dbId)).catch(console.error)
   }, [sel])
 
+  // ── Adjust rotation by delta degrees ────────────────────────────────────
+  const adjustRotation = useCallback((delta: number) => {
+    const fx = fixRef.current.find(f => f.iid === sel)
+    if (!fx) return
+    const newRot = ((fx.rotation + delta) % 360 + 360) % 360
+    setFixes(p => p.map(f => f.iid === sel ? { ...f, rotation: newRot } : f))
+    if (fx.dbId) {
+      setSaving(true)
+      directus.request(updateItem('floor_fixtures', fx.dbId, { rotation: newRot }))
+        .finally(() => setSaving(false))
+    }
+  }, [sel])
+
+  const startRotHold = useCallback((delta: number) => {
+    adjustRotation(delta)
+    rotHoldTimeout.current = setTimeout(() => {
+      rotHoldInterval.current = setInterval(() => adjustRotation(delta * 10), 120)
+    }, 400)
+  }, [adjustRotation])
+
+  const stopRotHold = useCallback(() => {
+    if (rotHoldTimeout.current) { clearTimeout(rotHoldTimeout.current); rotHoldTimeout.current = null }
+    if (rotHoldInterval.current) { clearInterval(rotHoldInterval.current); rotHoldInterval.current = null }
+  }, [])
+
+  // ── Mirror door horizontally ──────────────────────────────────────────────
+  const mirrorSel = useCallback(() => {
+    const fx = fixRef.current.find(f => f.iid === sel)
+    if (!fx) return
+    const newMirrored = !fx.mirrored
+    setFixes(p => p.map(f => f.iid === sel ? { ...f, mirrored: newMirrored } : f))
+    if (fx.dbId) {
+      setSaving(true)
+      directus.request(updateItem('floor_fixtures', fx.dbId, { mirrored: newMirrored }))
+        .finally(() => setSaving(false))
+    }
+  }, [sel])
+
   // ── Drag fixture ──────────────────────────────────────────────────────────
-  const handlePointerDown = useCallback((e: React.PointerEvent<SVGRectElement>, iid: string) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent, iid: string) => {
     e.stopPropagation()
+    e.preventDefault()  // block page scroll for this touch
     setSel(iid)
-    const el  = e.currentTarget
-    el.setPointerCapture(e.pointerId)
+    ;(e.currentTarget as SVGElement).setPointerCapture(e.pointerId)
+
     const svg = svgRef.current!
     const sp  = toSvgPt(svg, e.clientX, e.clientY)
     const fx0 = fixRef.current.find(f => f.iid === iid)!
@@ -178,19 +282,27 @@ export default function FloorPlan({ designId }: { designId: number }) {
     let moved = false
 
     const onMove = (ev: PointerEvent) => {
+      if (!moved && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 8) return
+      if (!moved) {
+        moved = true
+        draggingRef.current = iid
+        navigator.vibrate?.(40)  // haptic feedback when drag activates
+      }
+
       const cp  = toSvgPt(svg, ev.clientX, ev.clientY)
       const dmx = (cp.x - sp.x) / sc
       const dmy = (cp.y - sp.y) / sc
-      if (!moved && Math.hypot(dmx, dmy) < 5) return
-      moved = true
+
       const nx = Math.max(0, Math.min(bboxW - fw, fx0.x + dmx))
       const ny = Math.max(0, Math.min(bboxH - fh, fx0.y + dmy))
       setFixes(p => p.map(f => f.iid === iid ? { ...f, x: nx, y: ny } : f))
     }
 
     const onUp = () => {
-      el.removeEventListener('pointermove', onMove as EventListener)
-      el.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      draggingRef.current = null
+
       if (!moved) return
       const upd = fixRef.current.find(f => f.iid === iid)
       if (upd?.dbId) {
@@ -200,12 +312,30 @@ export default function FloorPlan({ designId }: { designId: number }) {
       }
     }
 
-    el.addEventListener('pointermove', onMove as EventListener)
-    el.addEventListener('pointerup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
   }, [geo])
 
+  // ── Done ──────────────────────────────────────────────────────────────────
+  const handleDone = useCallback(async () => {
+    if (!design) return
+    setSaving(true)
+    const { bboxW, bboxH, hasShape: hs } = computeGeometry(design?.room_shape?.walls, design?.wall_mm ?? 4200)
+    try {
+      await directus.request(updateItem('designs', designId, {
+        badge: 'Floor Plan Done',
+        subtitle: hs
+          ? `${(bboxW / 1000).toFixed(1)}m × ${(bboxH / 1000).toFixed(1)}m · ${fixes.length} fixture${fixes.length !== 1 ? 's' : ''}`
+          : `${((design.wall_mm ?? 4200) / 1000).toFixed(1)}m · ${fixes.length} fixture${fixes.length !== 1 ? 's' : ''}`,
+      }))
+      router.push(`/wall-view/${designId}`)
+    } catch {
+      setSaving(false)
+    }
+  }, [design, designId, fixes, router])
+
   // ── Render ────────────────────────────────────────────────────────────────
-  if (loading) return <><StatusBar /><Spinner /><BottomNav designId={designId} /></>
+
 
   const { sc, svgH, offX, offY, bboxW, bboxH, polyPts, hasShape } = geo
   const wallMm = design?.wall_mm ?? 4200
@@ -215,155 +345,345 @@ export default function FloorPlan({ designId }: { designId: number }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      <StatusBar />
+
       <AppHeader
-        title={design?.name ?? 'Floor Plan'}
+        title={design?.name ?? 'Floorplan'}
         subtitle={hasShape
           ? `${(bboxW / 1000).toFixed(1)}m × ${(bboxH / 1000).toFixed(1)}m`
           : `${(wallMm / 1000).toFixed(1)}m × ${(FALLBACK_D / 1000).toFixed(1)}m (default)`}
-        onBack={() => router.push(`/wall-view/${designId}`)}
+        onBack={() => router.push('/designs')}
         actions={saving
           ? <span style={{ fontSize: 11, color: '#C8A96E', marginRight: 4 }}>Saving…</span>
-          : undefined}
+          : (
+            <button onClick={handleDone} style={{
+              padding: '7px 14px', borderRadius: 8, border: 'none',
+              background: 'linear-gradient(135deg,#C8A96E,#A07840)',
+              color: '#0F0F0E', fontSize: 12, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <SaveIcon size={14} />
+              Save
+            </button>
+          )}
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div ref={containerRef} style={{ flex: 1, overflow: 'hidden', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ── SVG floor plan ── */}
-        <div style={{ background: '#1A1917', borderRadius: 12, overflow: 'hidden', border: '1px solid #2A2825' }}>
-          <svg
-            ref={svgRef}
-            viewBox={`0 0 ${SVG_W} ${svgH}`}
-            style={{ display: 'block', width: '100%', height: 'auto' }}
-            onClick={() => setSel(null)}
-          >
-            {/* Room fill */}
-            <polygon points={polyPts} fill="#0F0F0E" />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#1A1917', borderRadius: 12, overflow: 'hidden', border: '1px solid #2A2825', width: 'fit-content' }}>
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${geo.bboxW * geo.sc + PAD * 2} ${svgH}`}
+              style={{ display: 'block', width: geo.bboxW * geo.sc + PAD * 2, maxWidth: '100%', height: 'auto', touchAction: 'none' }}
+              onClick={() => setSel(null)}
+            >
+              {/* Room fill */}
+              <polygon points={polyPts} fill="#0F0F0E" />
 
-            {/* Upper cabinets – dashed along top of room (first wall for polygon, top edge for rect) */}
-            {(() => {
-              let cx = 0
-              return uppers.map((wm, i) => {
-                const p1 = mmToSvg(cx, 0), p2 = mmToSvg(cx + wm, 0)
-                const ph = CAB_UPPER_D * sc
-                cx += wm
-                return <rect key={i} x={p1.x} y={p1.y} width={Math.abs(p2.x - p1.x)} height={ph}
-                  fill="rgba(42,40,37,0.9)" stroke="#3A3835" strokeWidth={1} strokeDasharray="4 2" />
-              })
-            })()}
+              {/* Upper cabinets – dashed along top of room (first wall for polygon, top edge for rect) */}
+              {(() => {
+                let cx = 0
+                return uppers.map((wm, i) => {
+                  const p1 = mmToSvg(cx, 0), p2 = mmToSvg(cx + wm, 0)
+                  const ph = CAB_UPPER_D * sc
+                  cx += wm
+                  return <rect key={i} x={p1.x} y={p1.y} width={Math.abs(p2.x - p1.x)} height={ph}
+                    fill="rgba(42,40,37,0.9)" stroke="#3A3835" strokeWidth={1} strokeDasharray="4 2" />
+                })
+              })()}
 
-            {/* Base cabinets – solid along bottom of room */}
-            {(() => {
-              let cx = 0
-              return bases.map((wm, i) => {
-                const p1 = mmToSvg(cx, bboxH - CAB_BASE_D)
-                const ph = CAB_BASE_D * sc, pw = wm * sc
-                cx += wm
-                return <rect key={i} x={p1.x} y={p1.y} width={pw} height={ph}
-                  fill="#2A2825" stroke="#3A3835" strokeWidth={1} />
-              })
-            })()}
+              {/* Base cabinets – solid along bottom of room */}
+              {(() => {
+                let cx = 0
+                return bases.map((wm, i) => {
+                  const p1 = mmToSvg(cx, bboxH - CAB_BASE_D)
+                  const ph = CAB_BASE_D * sc, pw = wm * sc
+                  cx += wm
+                  return <rect key={i} x={p1.x} y={p1.y} width={pw} height={ph}
+                    fill="#2A2825" stroke="#3A3835" strokeWidth={1} />
+                })
+              })()}
 
-            {/* Room outline */}
-            <polygon points={polyPts} fill="none" stroke="#5A5550" strokeWidth={2} strokeLinejoin="round" />
+              {/* Room outline */}
+              <polygon points={polyPts} fill="none" stroke="#5A5550" strokeWidth={2} strokeLinejoin="round" />
 
-            {/* Dimension labels */}
-            <text x={SVG_W / 2} y={12} textAnchor="middle" fontSize={9} fill="#4A4845">
-              {(bboxW / 1000).toFixed(1)}m
-            </text>
-            <text x={SVG_W - 6} y={svgH / 2} textAnchor="middle" fontSize={9} fill="#4A4845"
-              transform={`rotate(-90,${SVG_W - 6},${svgH / 2})`}>
-              {(bboxH / 1000).toFixed(1)}m
-            </text>
+              {/* Dimension labels */}
+              <text x={(geo.bboxW * geo.sc + PAD * 2) / 2} y={12} textAnchor="middle" fontSize={9} fill="#4A4845">
+                {(bboxW / 1000).toFixed(1)}m
+              </text>
+              <text x={(geo.bboxW * geo.sc + PAD * 2) - 6} y={svgH / 2} textAnchor="middle" fontSize={9} fill="#4A4845"
+                transform={`rotate(-90,${(geo.bboxW * geo.sc + PAD * 2) - 6},${svgH / 2})`}>
+                {(bboxH / 1000).toFixed(1)}m
+              </text>
 
-            {/* Fixtures */}
-            {fixes.map(fx => {
-              const [fw, fh] = SZ[fx.type]
-              const sp = mmToSvg(fx.x, fx.y)
-              const pw = fw * sc, ph = fh * sc
-              const isSelected = sel === fx.iid
-              return (
-                <g key={fx.iid}>
-                  <rect
-                    x={sp.x} y={sp.y} width={pw} height={ph}
-                    fill={CLR[fx.type]} rx={3}
-                    stroke={isSelected ? '#F2EDE6' : 'transparent'}
-                    strokeWidth={isSelected ? 1.5 : 0}
-                    style={{ cursor: 'grab', touchAction: 'none' }}
+              {/* Fixtures */}
+              {fixes.filter(fx => fx.type in SZ).map(fx => {
+                const [fw, fh] = SZ[fx.type]
+                const sp = mmToSvg(fx.x, fx.y)
+                const pw = fw * sc, ph = fh * sc
+                const cx = sp.x + pw / 2, cy = sp.y + ph / 2
+                const isSelected = sel === fx.iid
+                const rot = fx.rotation ?? 0
+                const mirrored = fx.mirrored ?? false
+
+                // Hit area covers rotated bounding box — use max dimension for safety
+                const maxDim = Math.max(pw, ph) + 24
+
+                return (
+                  <g key={fx.iid}
                     onPointerDown={e => handlePointerDown(e, fx.iid)}
-                  />
-                  {fx.type === 'stove' && [0, 1, 2, 3].map(i => (
-                    <circle key={i}
-                      cx={sp.x + (i % 2 === 0 ? 0.28 : 0.72) * pw}
-                      cy={sp.y + (i < 2 ? 0.3 : 0.7) * ph}
-                      r={Math.min(pw, ph) * 0.11} fill="rgba(0,0,0,0.25)"
-                      style={{ pointerEvents: 'none' }} />
-                  ))}
-                  {fx.type === 'basin' && (
-                    <ellipse cx={sp.x + pw / 2} cy={sp.y + ph / 2} rx={pw * 0.35} ry={ph * 0.3}
-                      fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth={1}
-                      style={{ pointerEvents: 'none' }} />
-                  )}
-                  {fx.type === 'door' && (
-                    <path
-                      d={`M ${sp.x + pw * 0.05} ${sp.y + ph * 0.95} A ${pw * 0.85} ${ph * 0.85} 0 0 1 ${sp.x + pw * 0.95} ${sp.y + ph * 0.05}`}
-                      fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth={1}
-                      style={{ pointerEvents: 'none' }} />
-                  )}
-                  {fx.type === 'window' && (
-                    <line x1={sp.x + pw * 0.1} y1={sp.y + ph / 2} x2={sp.x + pw * 0.9} y2={sp.y + ph / 2}
-                      stroke="rgba(0,0,0,0.3)" strokeWidth={1.5}
-                      style={{ pointerEvents: 'none' }} />
-                  )}
-                  <text x={sp.x + pw / 2} y={sp.y + ph / 2 + 4} textAnchor="middle"
-                    fontSize={Math.max(8, Math.min(11, ph * 0.18))} fill="#0F0F0E" fontWeight="600"
-                    style={{ pointerEvents: 'none', userSelect: 'none' }}>
-                    {LBL[fx.type]}
-                  </text>
-                </g>
-              )
-            })}
-          </svg>
+                    style={{ cursor: 'grab' }}
+                    transform={rot ? `rotate(${rot},${cx},${cy})` : undefined}
+                  >
+                    {/* Invisible hit area (centred, covers rotated bounds) */}
+                    <rect
+                      x={cx - maxDim / 2} y={cy - maxDim / 2}
+                      width={maxDim} height={maxDim}
+                      fill="transparent"
+                    />
 
-          {/* Legend */}
-          <div style={{ padding: '8px 12px', borderTop: '1px solid #2A2825', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 16, height: 10, background: '#2A2825', border: '1px solid #3A3835' }} />
-              <span style={{ fontSize: 10, color: '#6A6560' }}>Base</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 16, height: 10, background: 'rgba(42,40,37,0.9)', border: '1px dashed #3A3835' }} />
-              <span style={{ fontSize: 10, color: '#6A6560' }}>Upper (overhead)</span>
-            </div>
-            {!hasShape && (
+                    {/* Visible fixture */}
+                    {(() => {
+                      const isElec  = fx.type === 'socket' || fx.type === 'light_switch' || fx.type === 'db_board'
+                      const isPlumb = fx.type === 'drain'
+                      const baseStroke = isElec ? '#6A9EC8' : isPlumb ? '#50B4C8' : '#C8A96E'
+                      return (
+                        <rect x={sp.x} y={sp.y} width={pw} height={ph}
+                          fill={CLR[fx.type]} rx={3}
+                          stroke={isSelected ? '#F2EDE6' : baseStroke}
+                          strokeWidth={isSelected ? 2 : 1} />
+                      )
+                    })()}
+                    {fx.type === 'stove' && [0, 1, 2, 3].map(i => (
+                      <circle key={i}
+                        cx={sp.x + (i % 2 === 0 ? 0.28 : 0.72) * pw}
+                        cy={sp.y + (i < 2 ? 0.3 : 0.7) * ph}
+                        r={Math.min(pw, ph) * 0.11} fill="rgba(160,130,80,0.5)"
+                        stroke="#A07840" strokeWidth={0.5}
+                        style={{ pointerEvents: 'none' }} />
+                    ))}
+                    {fx.type === 'sink' && (
+                      <g style={{ pointerEvents: 'none' }}>
+                        {/* Double bowl kitchen sink */}
+                        {/* Left bowl */}
+                        <rect x={sp.x + pw * 0.06} y={sp.y + ph * 0.1} width={pw * 0.41} height={ph * 0.78}
+                          fill="rgba(160,130,80,0.15)" stroke="#A07840" strokeWidth={1} rx={2} />
+                        <circle cx={sp.x + pw * 0.265} cy={sp.y + ph * 0.5} r={Math.min(pw * 0.41, ph * 0.78) * 0.12}
+                          fill="none" stroke="#A07840" strokeWidth={0.8} />
+                        {/* Right bowl */}
+                        <rect x={sp.x + pw * 0.53} y={sp.y + ph * 0.1} width={pw * 0.41} height={ph * 0.78}
+                          fill="rgba(160,130,80,0.15)" stroke="#A07840" strokeWidth={1} rx={2} />
+                        <circle cx={sp.x + pw * 0.735} cy={sp.y + ph * 0.5} r={Math.min(pw * 0.41, ph * 0.78) * 0.12}
+                          fill="none" stroke="#A07840" strokeWidth={0.8} />
+                        {/* Tap — between bowls */}
+                        <circle cx={cx} cy={sp.y + ph * 0.28} r={pw * 0.03}
+                          fill="#A07840" />
+                        <line x1={cx} y1={sp.y + ph * 0.28} x2={cx} y2={sp.y + ph * 0.5}
+                          stroke="#A07840" strokeWidth={1} />
+                      </g>
+                    )}
+                    {fx.type === 'basin' && (
+                      <ellipse cx={cx} cy={cy} rx={pw * 0.35} ry={ph * 0.3}
+                        fill="none" stroke="#A07840" strokeWidth={1}
+                        style={{ pointerEvents: 'none' }} />
+                    )}
+                    {fx.type === 'door' && (
+                      <g transform={mirrored ? `scale(-1,1) translate(${-(sp.x * 2 + pw)},0)` : undefined}
+                        style={{ pointerEvents: 'none' }}>
+                        <path
+                          d={`M ${sp.x + pw * 0.05} ${sp.y + ph * 0.95} A ${pw * 0.85} ${ph * 0.85} 0 0 1 ${sp.x + pw * 0.95} ${sp.y + ph * 0.05}`}
+                          fill="none" stroke="#A07840" strokeWidth={1} />
+                      </g>
+                    )}
+                    {fx.type === 'window' && (
+                      <line x1={sp.x + pw * 0.1} y1={cy} x2={sp.x + pw * 0.9} y2={cy}
+                        stroke="#A07840" strokeWidth={1.5}
+                        style={{ pointerEvents: 'none' }} />
+                    )}
+                    {fx.type === 'oven' && (
+                      <g style={{ pointerEvents: 'none' }}>
+                        {/* Oven door with window */}
+                        <rect x={sp.x + pw * 0.1} y={sp.y + ph * 0.1}
+                          width={pw * 0.8} height={ph * 0.8}
+                          fill="none" stroke="#A07840" strokeWidth={1} rx={2} />
+                        <rect x={sp.x + pw * 0.2} y={sp.y + ph * 0.2}
+                          width={pw * 0.6} height={ph * 0.35}
+                          fill="rgba(160,120,60,0.2)" stroke="#A07840" strokeWidth={0.8} rx={2} />
+                        {/* Handle */}
+                        <line x1={sp.x + pw * 0.25} y1={sp.y + ph * 0.65}
+                          x2={sp.x + pw * 0.75} y2={sp.y + ph * 0.65}
+                          stroke="#A07840" strokeWidth={2} strokeLinecap="round" />
+                      </g>
+                    )}
+                    {fx.type === 'socket' && (
+                      <g style={{ pointerEvents: 'none' }}>
+                        {/* SA 3-pin socket — outer frame with perspective trapezoid */}
+                        <line x1={sp.x} y1={sp.y} x2={sp.x + pw * 0.2} y2={sp.y + ph * 0.2} stroke="#6A9EC8" strokeWidth={1} />
+                        <line x1={sp.x + pw} y1={sp.y} x2={sp.x + pw * 0.8} y2={sp.y + ph * 0.2} stroke="#6A9EC8" strokeWidth={1} />
+                        <line x1={sp.x + pw} y1={sp.y + ph} x2={sp.x + pw * 0.8} y2={sp.y + ph * 0.8} stroke="#6A9EC8" strokeWidth={1} />
+                        <line x1={sp.x} y1={sp.y + ph} x2={sp.x + pw * 0.2} y2={sp.y + ph * 0.8} stroke="#6A9EC8" strokeWidth={1} />
+                        {/* Inner faceplate */}
+                        <rect x={sp.x + pw * 0.18} y={sp.y + ph * 0.18} width={pw * 0.64} height={ph * 0.64}
+                          fill="none" stroke="#6A9EC8" strokeWidth={1} />
+                        {/* Top pin (earth) — vertical rect, centred */}
+                        <rect x={cx - pw * 0.08} y={sp.y + ph * 0.28} width={pw * 0.16} height={ph * 0.18}
+                          fill="rgba(106,158,200,0.5)" stroke="#6A9EC8" strokeWidth={0.8} rx={1} />
+                        {/* Bottom-left pin (live) */}
+                        <rect x={sp.x + pw * 0.25} y={sp.y + ph * 0.54} width={pw * 0.18} height={ph * 0.14}
+                          fill="rgba(106,158,200,0.5)" stroke="#6A9EC8" strokeWidth={0.8} rx={1} />
+                        {/* Bottom-right pin (neutral) */}
+                        <rect x={sp.x + pw * 0.57} y={sp.y + ph * 0.54} width={pw * 0.18} height={ph * 0.14}
+                          fill="rgba(106,158,200,0.5)" stroke="#6A9EC8" strokeWidth={0.8} rx={1} />
+                      </g>
+                    )}
+                    {fx.type === 'light_switch' && (
+                      <g style={{ pointerEvents: 'none' }}>
+                        {/* Inner border */}
+                        <rect x={sp.x + pw * 0.1} y={sp.y + ph * 0.1} width={pw * 0.8} height={ph * 0.8}
+                          fill="none" stroke="#6A9EC8" strokeWidth={0.8} />
+                        {/* Circle (pivot) — lower centre */}
+                        <circle cx={cx} cy={sp.y + ph * 0.72} r={Math.min(pw, ph) * 0.12}
+                          fill="none" stroke="#6A9EC8" strokeWidth={1} />
+                        {/* Lever — diagonal from circle to upper-right */}
+                        <line x1={cx} y1={sp.y + ph * 0.72}
+                          x2={sp.x + pw * 0.72} y2={sp.y + ph * 0.22}
+                          stroke="#6A9EC8" strokeWidth={1.2} strokeLinecap="round" />
+                      </g>
+                    )}
+                    {fx.type === 'db_board' && (
+                      <g style={{ pointerEvents: 'none' }}>
+                        {/* Cabinet door */}
+                        <rect x={sp.x + pw * 0.06} y={sp.y + ph * 0.08} width={pw * 0.88} height={ph * 0.84}
+                          fill="none" stroke="#6A9EC8" strokeWidth={1} rx={1} />
+                        {/* Name plate at top */}
+                        <rect x={sp.x + pw * 0.25} y={sp.y + ph * 0.14} width={pw * 0.5} height={ph * 0.18}
+                          fill="rgba(106,158,200,0.3)" stroke="#6A9EC8" strokeWidth={0.8} rx={1} />
+                        {/* Door latch — small circle on left */}
+                        <circle cx={sp.x + pw * 0.14} cy={cy} r={Math.min(pw, ph) * 0.06}
+                          fill="none" stroke="#6A9EC8" strokeWidth={1} />
+                        {/* Hazard triangle */}
+                        {(() => {
+                          const tx = cx, ty = sp.y + ph * 0.55, tr = Math.min(pw, ph) * 0.26
+                          const t1x = tx, t1y = ty - tr
+                          const t2x = tx - tr * 0.87, t2y = ty + tr * 0.5
+                          const t3x = tx + tr * 0.87, t3y = ty + tr * 0.5
+                          return <>
+                            <polygon points={`${t1x},${t1y} ${t2x},${t2y} ${t3x},${t3y}`}
+                              fill="rgba(106,158,200,0.15)" stroke="#6A9EC8" strokeWidth={0.8} />
+                            {/* Lightning bolt */}
+                            <polyline points={`${tx + tr * 0.1},${ty - tr * 0.4} ${tx - tr * 0.1},${ty + tr * 0.05} ${tx + tr * 0.08},${ty + tr * 0.05} ${tx - tr * 0.1},${ty + tr * 0.4}`}
+                              fill="none" stroke="#6A9EC8" strokeWidth={0.9} strokeLinejoin="round" />
+                          </>
+                        })()}
+                      </g>
+                    )}
+                    {fx.type === 'drain' && (
+                      <g style={{ pointerEvents: 'none' }}>
+                        {/* Circle with X — standard drain symbol */}
+                        <circle cx={cx} cy={cy} r={Math.min(pw, ph) * 0.35}
+                          fill="none" stroke="#50B4C8" strokeWidth={1.2} />
+                        <line x1={cx - pw * 0.22} y1={cy - ph * 0.22} x2={cx + pw * 0.22} y2={cy + ph * 0.22}
+                          stroke="#50B4C8" strokeWidth={1.2} />
+                        <line x1={cx + pw * 0.22} y1={cy - ph * 0.22} x2={cx - pw * 0.22} y2={cy + ph * 0.22}
+                          stroke="#50B4C8" strokeWidth={1.2} />
+                      </g>
+                    )}
+                    <text x={cx} y={cy + 4} textAnchor="middle"
+                      fontSize={Math.max(8, Math.min(11, Math.min(pw, ph) * 0.18))} fill="#C8A96E" fontWeight="700"
+                      style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                      {LBL[fx.type]}
+                    </text>
+                  </g>
+                )
+              })}
+
+            </svg>
+
+            {/* Legend */}
+            <div style={{ padding: '8px 12px', borderTop: '1px solid #2A2825', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 16, height: 10, background: '#2A2825', border: '1px solid #3A3835' }} />
+                <span style={{ fontSize: 10, color: '#6A6560' }}>Base</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 16, height: 10, background: 'rgba(42,40,37,0.9)', border: '1px dashed #3A3835' }} />
+                <span style={{ fontSize: 10, color: '#6A6560' }}>Upper (overhead)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 16, height: 10, background: 'rgba(110,160,200,0.28)', border: '1px solid #6A9EC8' }} />
+                <span style={{ fontSize: 10, color: '#6A6560' }}>Electrical</span>
+              </div>
               <button
-                onClick={() => router.push(`/room-setup/${designId}`)}
+                onClick={() => router.push(`/room-setup/${designId}?from=floor-plan`)}
                 style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#C8A96E', fontSize: 10, fontWeight: 600 }}
               >
                 Edit room shape →
               </button>
-            )}
+            </div>
           </div>
         </div>
 
         {/* ── Fixture toolbar ── */}
-        <div style={{ background: '#1A1917', borderRadius: 12, border: '1px solid #2A2825', padding: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', marginBottom: 10,
+        <div style={{ background: '#1A1917', borderRadius: 12, border: '1px solid #2A2825', padding: 12, flexShrink: 0 }}>          <div style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', marginBottom: 10,
             textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Add Fixture
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-            {(['door', 'window', 'basin', 'stove'] as FType[]).map(t => (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+            {(ROOM_FIXTURES[design?.room_type ?? ''] ?? ALL_TYPES).map(t => (
               <button key={t} onClick={() => setAddType(t)} style={{
-                flex: 1, padding: '8px 4px', borderRadius: 8, border: 'none',
-                background: addType === t ? CLR[t] : '#242220',
-                color: addType === t ? '#0F0F0E' : '#6A6560',
+                flex: 1, padding: '8px 4px', borderRadius: 8,
+                background: addType === t ? 'rgba(200,169,110,0.18)' : '#242220',
+                border: `1px solid ${addType === t ? '#C8A96E' : '#3A3835'}`,
+                color: addType === t ? '#C8A96E' : '#6A6560',
                 fontSize: 11, fontWeight: 600, transition: 'all 0.15s',
               }}>
                 {LBL[t]}
               </button>
             ))}
           </div>
+          {/* Rotation / mirror row — always rendered to avoid layout shift */}
+          {(() => {
+            const selFx = fixes.find(f => f.iid === sel)
+            const rot = selFx?.rotation ?? 0
+            const isDoor = selFx?.type === 'door'
+            const mirrored = selFx?.mirrored ?? false
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, visibility: sel ? 'visible' : 'hidden' }}>
+                <button
+                  onPointerDown={() => startRotHold(-5)}
+                  onPointerUp={stopRotHold} onPointerLeave={stopRotHold} onPointerCancel={stopRotHold}
+                  style={{
+                    width: 36, height: 36, borderRadius: 8, border: '1px solid #3A3835',
+                    background: '#242220', color: '#C8A96E', fontSize: 20, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>−</button>
+                <div style={{
+                  flex: 1, height: 36, borderRadius: 8, border: '1px solid #3A3835',
+                  background: '#242220', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 600, color: '#F2EDE6',
+                }}>{rot}°</div>
+                <button
+                  onPointerDown={() => startRotHold(5)}
+                  onPointerUp={stopRotHold} onPointerLeave={stopRotHold} onPointerCancel={stopRotHold}
+                  style={{
+                    width: 36, height: 36, borderRadius: 8, border: '1px solid #3A3835',
+                    background: '#242220', color: '#C8A96E', fontSize: 20, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>+</button>
+                {/* Mirror — always reserve space, only interactive for doors */}
+                <button onClick={mirrorSel} disabled={!isDoor} style={{
+                  width: 36, height: 36, borderRadius: 8,
+                  border: `1px solid ${isDoor && mirrored ? '#C8A96E' : '#3A3835'}`,
+                  background: isDoor && mirrored ? 'rgba(200,169,110,0.18)' : '#242220',
+                  color: isDoor ? '#C8A96E' : '#3A3835',
+                  fontSize: 16, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  opacity: isDoor ? 1 : 0.3,
+                }}>↔</button>
+              </div>
+            )
+          })()}
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={addFixture} style={{
               flex: 1, padding: '11px 0', borderRadius: 10, border: 'none',
@@ -372,21 +692,19 @@ export default function FloorPlan({ designId }: { designId: number }) {
             }}>
               + Place {LBL[addType]}
             </button>
-            {sel && (
-              <button onClick={removeSel} style={{
-                padding: '11px 14px', borderRadius: 10,
-                background: 'rgba(224,92,92,0.15)', border: '1px solid rgba(224,92,92,0.3)',
-                color: '#E05C5C',
-              }}>
-                <TrashIcon />
-              </button>
-            )}
+            {/* Trash — always rendered to avoid layout shift */}
+            <button onClick={removeSel} style={{
+              padding: '11px 14px', borderRadius: 10,
+              background: 'rgba(224,92,92,0.15)', border: '1px solid rgba(224,92,92,0.3)',
+              color: '#E05C5C',
+              visibility: sel ? 'visible' : 'hidden',
+            }}>
+              <TrashIcon />
+            </button>
           </div>
-          {sel && (
-            <p style={{ fontSize: 11, color: '#6A6560', marginTop: 8, textAlign: 'center' }}>
-              Drag fixture to reposition · tap trash to remove
-            </p>
-          )}
+          <p style={{ fontSize: 11, color: '#6A6560', marginTop: 8, textAlign: 'center', visibility: sel ? 'visible' : 'hidden' }}>
+            Hold to drag · tap trash to remove
+          </p>
         </div>
       </div>
 

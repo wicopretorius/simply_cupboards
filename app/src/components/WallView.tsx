@@ -3,9 +3,9 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 import { useRouter } from 'next/navigation'
 import { directus } from '@/lib/directus'
 import { readItem, readItems, createItem, updateItem, deleteItem } from '@directus/sdk'
-import type { PaletteItem, Design, CabinetTab } from '@/lib/types'
+import type { PaletteItem, Design, CabinetTab, FloorFixture } from '@/lib/types'
 import {
-  StatusBar, BottomNav, IconBtn,
+  BottomNav, IconBtn,
   ChevronLeft, ChevronRight, DotsIcon, TrashIcon, ArrowLeftIcon, ArrowRightIcon,
 } from './SharedUI'
 
@@ -37,7 +37,7 @@ const CabinetFace = ({
   isUpper: boolean; onSelect: () => void; onPointerDown: (e: React.PointerEvent) => void
 }) => {
   const { item } = cabinet
-  const handles = item.doors === 0 && !item.is_drawer
+  const handles = item.doors === 0 && !item.is_drawer && !item.is_appliance
     ? [50]
     : Array.from({ length: item.doors }, (_, d) => ((d + 0.5) / item.doors) * 100)
 
@@ -61,27 +61,24 @@ const CabinetFace = ({
       {item.doors >= 2 && Array.from({ length: item.doors - 1 }).map((_, i) => (
         <div key={i} style={{ position: 'absolute', top: 0, left: `${((i + 1) / item.doors) * 100}%`, width: 1, height: '100%', background: '#3A3530' }} />
       ))}
-      {item.is_drawer && (
+      {!!item.is_drawer && (
         <>
           <div style={{ position: 'absolute', top: '33%', left: 4, right: 4, height: 1, background: '#3A3530' }} />
           <div style={{ position: 'absolute', top: '66%', left: 4, right: 4, height: 1, background: '#3A3530' }} />
         </>
       )}
-      {item.is_appliance && (
+      {!!item.is_appliance && (
         <div style={{ position: 'absolute', inset: 4, background: 'repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(200,169,110,0.06) 4px,rgba(200,169,110,0.06) 5px)' }} />
       )}
       {handles.map((pos, i) => (
         <div key={i} style={{
           position: 'absolute', top: '50%', left: `${pos}%`,
           transform: 'translate(-50%,-50%)',
-          width: 2, height: item.is_drawer ? 8 : 13,
-          background: item.is_appliance ? 'rgba(110,168,200,0.5)' : 'rgba(200,169,110,0.65)',
+          width: 2, height: !!item.is_drawer ? 8 : 13,
+          background: !!item.is_appliance ? 'rgba(110,168,200,0.5)' : 'rgba(200,169,110,0.65)',
           borderRadius: 1,
         }} />
       ))}
-      <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)', fontSize: 7, color: isSelected ? '#C8A96E' : 'rgba(90,85,80,0.7)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-        {item.width_mm}
-      </div>
       {isSelected && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: '#C8A96E', boxShadow: '0 0 6px rgba(200,169,110,0.8)' }} />}
     </div>
   )
@@ -109,14 +106,14 @@ const PaletteCard = ({ item, isSelected, onPointerDown }: {
       background: isSelected ? 'rgba(200,169,110,0.12)' : '#242220',
       border: `1px solid ${isSelected ? '#C8A96E' : '#3A3835'}`, borderRadius: 10,
       padding: '8px 6px 6px', cursor: 'grab', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-      touchAction: 'none', userSelect: 'none', minWidth: 0,
+      touchAction: 'none', userSelect: 'none', width: '100%', boxSizing: 'border-box',
     }}
   >
     <div style={{ width: '100%', height: 32, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div style={{ width: Math.min(42, 14 + item.doors * 10), height: 26, background: 'linear-gradient(180deg,#2E2A25,#252220)', border: `1px solid ${isSelected ? '#C8A96E' : '#3A3530'}`, position: 'relative', borderRadius: 1 }}>
         {item.doors >= 2 && <div style={{ position: 'absolute', top: 0, left: '50%', width: 1, height: '100%', background: '#3A3530' }} />}
         {item.doors >= 3 && <div style={{ position: 'absolute', top: 0, left: '33%', width: 1, height: '100%', background: '#3A3530' }} />}
-        {item.is_drawer && <div style={{ position: 'absolute', top: '45%', left: 0, right: 0, height: 1, background: '#3A3530' }} />}
+        {!!item.is_drawer && <div style={{ position: 'absolute', top: '45%', left: 0, right: 0, height: 1, background: '#3A3530' }} />}
       </div>
     </div>
     <div style={{ textAlign: 'center' }}>
@@ -139,20 +136,47 @@ export default function WallView({ designId }: { designId: number }) {
   const [loading, setLoading]           = useState(true)
   const [saving, setSaving]             = useState(false)
   const [wallPx, setWallPx]             = useState(342)
+  const [wallHeightPx, setWallHeightPx] = useState(300)
+  const [floorFixtures, setFloorFixtures] = useState<FloorFixture[]>([])
+  const [selWinId, setSelWinId]         = useState<number | null>(null)
 
-  const dragRef        = useRef<DragState | null>(null)
-  const cabinetsRef    = useRef<WallCabinet[]>([])
-  const baseRowRef     = useRef<HTMLDivElement>(null)
-  const upperRowRef    = useRef<HTMLDivElement>(null)
+  const dragRef          = useRef<DragState | null>(null)
+  const cabinetsRef      = useRef<WallCabinet[]>([])
+  const floorFixRef      = useRef<FloorFixture[]>([])
+  const winDragRef       = useRef<{ id: number; startClientX: number; startDistMm: number; perpDist: number } | null>(null)
+  const baseRowRef       = useRef<HTMLDivElement>(null)
+  const upperRowRef      = useRef<HTMLDivElement>(null)
   const wallContainerRef = useRef<HTMLDivElement>(null)
+  const paletteScrollRef = useRef<HTMLDivElement>(null)
+  const [scrollThumb, setScrollThumb] = useState({ left: 0, width: 0, visible: false })
+
+  const updateThumb = useCallback(() => {
+    const el = paletteScrollRef.current
+    if (!el) return
+    const { scrollLeft, scrollWidth, clientWidth } = el
+    if (scrollWidth <= clientWidth) { setScrollThumb(t => ({ ...t, visible: false })); return }
+    const ratio = clientWidth / scrollWidth
+    setScrollThumb({
+      visible: true,
+      width: Math.max(32, ratio * clientWidth),
+      left: (scrollLeft / (scrollWidth - clientWidth)) * (clientWidth - Math.max(32, ratio * clientWidth)),
+    })
+  }, [])
 
   useEffect(() => { cabinetsRef.current = cabinets }, [cabinets])
+  useEffect(() => { floorFixRef.current = floorFixtures }, [floorFixtures])
+
+  useEffect(() => {
+    // Recompute thumb after tab switch or palette load (content width changes)
+    const frame = requestAnimationFrame(updateThumb)
+    return () => cancelAnimationFrame(frame)
+  }, [activeTab, palette, updateThumb])
 
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
-        const [des, cabs, palItems] = await Promise.all([
+        const [des, cabs, palItems, fxs] = await Promise.all([
           directus.request(readItem('designs', designId, { fields: ['*'] })),
           directus.request(readItems('placed_cabinets', {
             filter: { design_id: { _eq: designId } },
@@ -160,8 +184,10 @@ export default function WallView({ designId }: { designId: number }) {
             sort: ['row', 'sort'],
           })),
           directus.request(readItems('palette_items', { sort: ['tab', 'width_mm'], limit: -1 })),
+          directus.request(readItems('floor_fixtures', { filter: { design_id: { _eq: designId } } })),
         ])
         setDesign(des as Design)
+        setFloorFixtures(fxs as FloorFixture[])
 
         // Map Directus records to WallCabinets
         const mapped: WallCabinet[] = (cabs as any[]).map(c => ({
@@ -181,7 +207,7 @@ export default function WallView({ designId }: { designId: number }) {
         }
         setPalette(grouped)
       } catch {
-        router.replace('/discover')
+        router.replace('/designs')
       } finally {
         setLoading(false)
       }
@@ -193,15 +219,95 @@ export default function WallView({ designId }: { designId: number }) {
   useLayoutEffect(() => {
     const el = wallContainerRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => setWallPx(el.clientWidth))
+    const measure = () => { setWallPx(el.clientWidth); setWallHeightPx(el.clientHeight) }
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
-    setWallPx(el.clientWidth)
+    measure()
     return () => ro.disconnect()
   }, [])
 
-  const wallMm = design?.wall_mm ?? 4200
+  const wallMm       = design?.wall_mm ?? 4200
+  const wallHeightMm = design?.wall_height_mm ?? 2400
   const baseCabs  = cabinets.filter(c => c.row === 'base').sort((a, b) => a.sort - b.sort)
   const upperCabs = cabinets.filter(c => c.row === 'upper').sort((a, b) => a.sort - b.sort)
+
+  // ── Wall 1 geometry ────────────────────────────────────────────────────────
+  const w1Angle  = ((design?.room_shape?.walls?.[0]?.angleDeg ?? 0) * Math.PI) / 180
+  const w1DirX   =  Math.cos(w1Angle)
+  const w1DirY   = -Math.sin(w1Angle)   // floor plan y increases downward
+  const w1NormX  =  Math.sin(w1Angle)   // inward normal (into room)
+  const w1NormY  =  Math.cos(w1Angle)
+
+  // Windows that touch / are near Wall 1
+  const WIN_THRESH = 350   // mm perpendicular snap distance
+
+  const wallWindows = floorFixtures
+    .filter(fx => fx.type === 'window')
+    .map(fx => {
+      const distAlong = fx.x * w1DirX + fx.y * w1DirY
+      const perpDist  = fx.x * w1NormX + fx.y * w1NormY
+      const wMm   = fx.width_mm  ?? 900
+      const hMm   = fx.height_mm ?? 1200
+      const sill  = fx.sill_height_mm ?? 900
+      return { fx, distAlong, perpDist, wMm, hMm, sill }
+    })
+    .filter(w => w.perpDist >= 0 && w.perpDist < WIN_THRESH && w.distAlong >= 0 && w.distAlong <= wallMm)
+
+  // Elevation scale: floor at (wallHeightPx - 22)px, ceiling at 8px
+  const FLOOR_PX = 22
+  const CEIL_PX  = 8
+  const elevPx   = wallHeightPx - FLOOR_PX - CEIL_PX
+  const mmToElev = (fromFloorMm: number) =>
+    wallHeightPx - FLOOR_PX - (fromFloorMm / wallHeightMm) * elevPx
+
+  // ── Window drag (2D: horizontal = along wall, vertical = sill height) ───────
+  const startWinDrag = useCallback((win: typeof wallWindows[0], e: React.PointerEvent) => {
+    e.stopPropagation()
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    setSelWinId(win.fx.id)
+    winDragRef.current = {
+      id: win.fx.id, startClientX: e.clientX, startDistMm: win.distAlong,
+      perpDist: win.perpDist,
+    }
+    const startClientY = e.clientY
+    const startSill    = win.sill
+
+    const onMove = (ev: PointerEvent) => {
+      const wr = winDragRef.current
+      if (!wr) return
+      // Horizontal: move along wall
+      const dxMm = ((ev.clientX - wr.startClientX) / wallPx) * wallMm
+      const newDist = Math.max(0, Math.min(wallMm - win.wMm, wr.startDistMm + dxMm))
+      const newX = newDist * w1DirX + wr.perpDist * w1NormX
+      const newY = newDist * w1DirY + wr.perpDist * w1NormY
+      // Vertical: drag up = higher sill (invert because screen-y and mm-from-floor are opposite)
+      const dyMm = -((ev.clientY - startClientY) / elevPx) * wallHeightMm
+      const newSill = Math.max(0, Math.min(wallHeightMm - win.hMm, Math.round(startSill + dyMm)))
+      setFloorFixtures(prev => prev.map(f =>
+        f.id === wr.id ? { ...f, x: newX, y: newY, sill_height_mm: newSill } : f
+      ))
+    }
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      const wr = winDragRef.current
+      if (!wr) return
+      const upd = floorFixRef.current.find(f => f.id === wr.id)
+      if (upd) directus.request(updateItem('floor_fixtures', upd.id, { x: upd.x, y: upd.y, sill_height_mm: upd.sill_height_mm ?? 900 }))
+      winDragRef.current = null
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallMm, wallPx, wallHeightMm, elevPx, w1DirX, w1DirY, w1NormX, w1NormY])
+
+  // ── Update window field and save ──────────────────────────────────────────
+  const updateWindowField = useCallback((id: number, patch: Partial<FloorFixture>) => {
+    setFloorFixtures(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f))
+    directus.request(updateItem('floor_fixtures', id, patch as any))
+  }, [])
 
   // ── Insertion index ────────────────────────────────────────────────────────
   const getInsertIndex = useCallback((
@@ -420,13 +526,13 @@ export default function WallView({ designId }: { designId: number }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      <StatusBar />
+
 
       {/* Header */}
       <div style={{ background: '#1A1917', borderBottom: '1px solid #3A3835', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <IconBtn onClick={() => router.push('/floor-plan')}><ChevronLeft /></IconBtn>
+        <IconBtn onClick={() => router.push('/designs')}><ChevronLeft /></IconBtn>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#F2EDE6' }}>{design?.name ?? 'Design'}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#F2EDE6' }}>{design?.name ?? 'Cupboards'}</div>
           <div style={{ fontSize: 10, color: '#6A6560' }}>{wallMm}mm wide{saving ? ' · saving…' : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -457,15 +563,45 @@ export default function WallView({ designId }: { designId: number }) {
           <div style={{ position: 'absolute', bottom: 22, right: -8, width: 32, height: 82, background: 'linear-gradient(90deg,#252220,#2E2A25)', border: '1px solid #3A3530', borderRight: 'none' }} />
         </div>
 
-        <div ref={wallContainerRef} style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <div ref={wallContainerRef} onClick={() => { setSelectedId(null); setSelWinId(null) }} style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 8, background: '#2E2C29', borderBottom: '1px solid #3A3835' }} />
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 22, background: 'repeating-linear-gradient(90deg,#2A2520 0px,#2A2520 59px,#201E1B 59px,#201E1B 60px)', borderTop: '2px solid #4A4845' }} />
           <div style={{ position: 'absolute', inset: '8px 0 22px 0', background: 'linear-gradient(180deg,#1C1916 0%,#161412 100%)' }} />
           <div style={{ position: 'absolute', bottom: 108, left: 0, right: 0, height: 7, background: 'linear-gradient(180deg,#5A4A35,#3A3025)', borderTop: '2px solid #6A5A45', zIndex: 5 }} />
-          <div style={{ position: 'absolute', top: 44, left: '35%', width: '22%', height: 80, border: '2px solid rgba(110,168,200,0.55)', background: 'rgba(110,168,200,0.06)', zIndex: 3, pointerEvents: 'none' }}>
-            <div style={{ position: 'absolute', top: 0, left: '50%', width: 1, height: '100%', background: 'rgba(110,168,200,0.3)' }} />
-            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'rgba(110,168,200,0.3)' }} />
-          </div>
+          {/* Dynamic windows from floor plan */}
+          {wallWindows.map(win => {
+            const leftPx   = (win.distAlong / wallMm) * wallPx
+            const widthPx  = Math.max(8, (win.wMm / wallMm) * wallPx)
+            const topPx    = Math.max(CEIL_PX, mmToElev(win.sill + win.hMm))
+            const botPx    = mmToElev(win.sill)
+            const heightPx = Math.max(8, botPx - topPx)
+            const isSel    = selWinId === win.fx.id
+            return (
+              <div
+                key={win.fx.id}
+                onPointerDown={e => startWinDrag(win, e)}
+                onClick={e => { e.stopPropagation(); setSelWinId(isSel ? null : win.fx.id) }}
+                style={{
+                  position: 'absolute', left: leftPx, top: topPx,
+                  width: widthPx, height: heightPx,
+                  border: `2px solid ${isSel ? '#C8A96E' : 'rgba(110,168,200,0.55)'}`,
+                  background: 'rgba(110,168,200,0.06)',
+                  zIndex: 4, cursor: 'grab', touchAction: 'none',
+                }}
+              >
+                <div style={{ position: 'absolute', top: 0, left: '50%', width: 1, height: '100%', background: 'rgba(110,168,200,0.3)' }} />
+                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'rgba(110,168,200,0.3)' }} />
+                {/* Always-visible distance label */}
+                <div style={{ position: 'absolute', bottom: -16, left: 0, fontSize: 7, color: 'rgba(200,169,110,0.6)', fontWeight: 700, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                  ←{Math.round(win.distAlong)}
+                </div>
+                {/* Sill label on left */}
+                <div style={{ position: 'absolute', top: '50%', left: -3, transform: 'translateX(-100%) translateY(-50%)', fontSize: 7, color: 'rgba(110,158,181,0.7)', fontWeight: 700, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+                  {win.sill}↑
+                </div>
+              </div>
+            )
+          })}
 
           <div style={{ position: 'absolute', top: 8, left: 0, right: 0, height: 60, zIndex: 6 }}>
             {renderRow(upperCabs, 'upper', 60)}
@@ -506,7 +642,21 @@ export default function WallView({ designId }: { designId: number }) {
         <div style={{ padding: '5px 12px 0', fontSize: 10, color: '#4A4845' }}>
           Drag onto wall to place · Tap placed cabinet to select
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, padding: '8px 12px 12px' }}>
+        <div
+          ref={paletteScrollRef}
+          onScroll={updateThumb}
+          style={{
+            display: 'grid',
+            gridTemplateRows: 'repeat(2, auto)',
+            gridAutoFlow: 'column',
+            gridAutoColumns: 72,
+            gap: 8,
+            padding: '8px 12px 4px',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            scrollbarWidth: 'none',
+          }}
+        >
           {(palette[activeTab] ?? []).map(item => (
             <PaletteCard
               key={item.id}
@@ -516,9 +666,96 @@ export default function WallView({ designId }: { designId: number }) {
             />
           ))}
         </div>
+
+        {/* Custom scrollbar — safe swipe zone */}
+        <div style={{ padding: '2px 12px 10px', position: 'relative', height: 18 }}>
+          {scrollThumb.visible && (
+            <>
+              {/* Track */}
+              <div style={{ position: 'absolute', inset: '6px 12px', background: '#2A2825', borderRadius: 4 }} />
+              {/* Thumb */}
+              <div
+                style={{
+                  position: 'absolute', top: 4, height: 10,
+                  left: 12 + scrollThumb.left, width: scrollThumb.width,
+                  background: '#C8A96E', borderRadius: 5, cursor: 'grab', touchAction: 'none',
+                }}
+                onPointerDown={e => {
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  const startX = e.clientX
+                  const el = paletteScrollRef.current!
+                  const startScroll = el.scrollLeft
+                  const trackW = el.clientWidth - scrollThumb.width
+                  const scrollRange = el.scrollWidth - el.clientWidth
+
+                  const onMove = (ev: PointerEvent) => {
+                    const delta = ev.clientX - startX
+                    el.scrollLeft = startScroll + (delta / trackW) * scrollRange
+                  }
+                  const onUp = () => {
+                    window.removeEventListener('pointermove', onMove)
+                    window.removeEventListener('pointerup', onUp)
+                  }
+                  window.addEventListener('pointermove', onMove)
+                  window.addEventListener('pointerup', onUp)
+                }}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {dragState?.active && <DragGhost item={dragState.item} x={dragState.x} y={dragState.y} />}
+
+      {/* Window edit panel */}
+      {selWinId !== null && (() => {
+        const win = wallWindows.find(w => w.fx.id === selWinId)
+        if (!win) return null
+        const inpSt: React.CSSProperties = {
+          width: '100%', background: '#0F0F0E', border: '1px solid #3A3835',
+          borderRadius: 8, padding: '6px 8px', color: '#F2EDE6', fontSize: 12,
+          outline: 'none', boxSizing: 'border-box',
+        }
+        return (
+          <div style={{ background: '#1A1917', borderTop: '1px solid #C8A96E', padding: '10px 14px', flexShrink: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#C8A96E', marginBottom: 8 }}>
+              Window · drag to reposition
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[
+                { label: 'Width mm', val: win.wMm,   key: 'width_mm'      },
+                { label: 'Height mm', val: win.hMm,  key: 'height_mm'     },
+                { label: 'Sill mm',   val: win.sill, key: 'sill_height_mm'},
+              ].map(({ label, val, key }) => (
+                <div key={key} style={{ flex: 1 }}>
+                  <div style={{ fontSize: 9, color: '#6A6560', marginBottom: 4 }}>{label}</div>
+                  <input
+                    style={inpSt}
+                    type="number"
+                    defaultValue={val}
+                    key={`${selWinId}-${key}`}
+                    onBlur={e => {
+                      const n = parseInt(e.target.value)
+                      if (!isNaN(n) && n > 0) updateWindowField(selWinId, { [key]: n } as any)
+                    }}
+                    onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                  />
+                </div>
+              ))}
+              <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 1 }}>
+                <button
+                  onClick={() => setSelWinId(null)}
+                  style={{ background: 'none', border: '1px solid #3A3835', borderRadius: 8, padding: '6px 10px', color: '#6A6560', fontSize: 11 }}
+                >✕</button>
+              </div>
+            </div>
+            <div style={{ fontSize: 9, color: '#4A4845', marginTop: 6 }}>
+              From left: {Math.round(win.distAlong)}mm · Sill: {win.sill}mm · Top: {win.sill + win.hMm}mm
+            </div>
+          </div>
+        )
+      })()}
+
       <BottomNav designId={designId} />
     </div>
   )

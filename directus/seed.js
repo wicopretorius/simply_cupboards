@@ -5,8 +5,8 @@
  */
 
 const DIRECTUS_URL = process.env.PUBLIC_URL ?? 'http://localhost:8055'
-const ADMIN_EMAIL  = process.env.ADMIN_EMAIL    ?? 'cupboards@jirehsoft.com'
-const ADMIN_PASS   = process.env.ADMIN_PASSWORD ?? 'admin_password_123'
+const ADMIN_EMAIL  = process.env.ADMIN_EMAIL    ?? 'admin@simcup.com'
+const ADMIN_PASS   = process.env.ADMIN_PASSWORD ?? 'admin_123'
 
 const PALETTE_ITEMS = [
   // ── Base Units ─────────────────────────────────────────────────────────────
