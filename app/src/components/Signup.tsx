@@ -2,7 +2,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { directus } from '@/lib/directus'
-import { registerUser } from '@directus/sdk'
+
+const DIRECTUS_URL = process.env.NEXT_PUBLIC_DIRECTUS_URL ?? 'http://localhost:8055'
 
 export default function Signup() {
   const router = useRouter()
@@ -34,14 +35,24 @@ export default function Signup() {
     }
     setLoading(true)
     try {
-      await directus.request(registerUser(email, password, {
-        first_name: firstName,
-        last_name: lastName || undefined,
-      }))
+      const res = await fetch(`${DIRECTUS_URL}/users/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          first_name: firstName,
+          ...(lastName ? { last_name: lastName } : {}),
+        }),
+      })
+      if (!res.ok) {
+        const json = await res.json()
+        throw new Error(json.errors?.[0]?.message ?? 'Registration failed')
+      }
       await directus.login({ email, password })
       router.replace('/designs')
     } catch (err: any) {
-      const msg = err?.errors?.[0]?.message ?? err?.message ?? ''
+      const msg = err?.message ?? ''
       if (msg.toLowerCase().includes('registered')) {
         setError('An account with this email already exists.')
       } else if (msg.toLowerCase().includes('not allowed') || msg.toLowerCase().includes('disabled')) {
