@@ -1,3 +1,9 @@
+export type AppRole = 'Free' | 'User' | 'Designer' | 'Business' | 'Admin'
+
+export const ROLE_RANK: Record<AppRole, number> = {
+  Free: 0, User: 1, Designer: 2, Business: 3, Admin: 4,
+}
+
 export type CabinetTab = 'Base Units' | 'Upper Units' | 'Tall Units' | 'Corner' | 'Appliances'
 
 export interface PaletteItem {
