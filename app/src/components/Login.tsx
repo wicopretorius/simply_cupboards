@@ -39,11 +39,8 @@ export default function Login() {
         <img
           src="/logo.png"
           alt="Design My Cupboards"
-          style={{ width: 220, height: 'auto', margin: '0 auto 8px', display: 'block' }}
+          style={{ width: 220, height: 'auto', margin: '0 auto', display: 'block' }}
         />
-        <div style={{ fontSize: 13, color: '#6A6560' }}>
-          Design your dream kitchen
-        </div>
       </div>
 
       {/* Form */}
