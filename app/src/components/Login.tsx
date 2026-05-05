@@ -36,19 +36,11 @@ export default function Login() {
 
       {/* Header */}
       <div style={{ paddingTop: 64, paddingBottom: 40, textAlign: 'center' }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: 18, margin: '0 auto 20px',
-          background: 'linear-gradient(135deg,#C8A96E,#A07840)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0F0F0E" strokeWidth="2" strokeLinecap="round">
-            <rect x="3" y="3" width="18" height="18" rx="3"/>
-            <path d="M3 9h18M9 21V9"/>
-          </svg>
-        </div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: '#F2EDE6', marginBottom: 6 }}>
-          DM Cupboards
-        </div>
+        <img
+          src="/logo.png"
+          alt="Design My Cupboards"
+          style={{ width: 220, height: 'auto', margin: '0 auto 8px', display: 'block' }}
+        />
         <div style={{ fontSize: 13, color: '#6A6560' }}>
           Design your dream kitchen
         </div>
