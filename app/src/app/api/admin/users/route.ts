@@ -15,7 +15,7 @@ export async function GET() {
   if (!ADMIN_TOKEN) return NextResponse.json({ error: 'Not configured' }, { status: 500 })
 
   const res = await fetch(
-    `${DIRECTUS}/users?fields=${FIELDS}&limit=-1&sort=date_created`,
+    `${DIRECTUS}/users?fields=${FIELDS}&limit=-1&sort=last_access`,
     { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` }, cache: 'no-store' }
   )
   const json = await res.json()
