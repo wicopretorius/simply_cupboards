@@ -83,9 +83,9 @@ export const SZ: Record<FType, [number, number]> = {
   basin:        [500,  400],
   stove:        [600,  600],
   oven:         [600,  600],
-  socket:       [100,  80],
-  light_switch: [80,   60],
-  db_board:     [500,  150],
+  socket:       [200,  160],
+  light_switch: [180,  120],
+  db_board:     [600,  200],
   drain:        [100,  100],
 }
 export const CLR: Record<FType, string> = {
