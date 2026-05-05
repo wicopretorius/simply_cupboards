@@ -57,7 +57,7 @@ export default function ProfilePage() {
   const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase() || email[0]?.toUpperCase() || '?'
 
   useEffect(() => {
-    directus.request(readMe())
+    directus.request(readMe({ fields: ['id', 'first_name', 'last_name', 'email', 'phone', 'avatar'] as any }))
       .then(me => {
         const u = me as unknown as Me
         setFirstName(u.first_name ?? '')
