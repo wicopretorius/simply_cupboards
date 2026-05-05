@@ -68,9 +68,9 @@ export default function ProfilePage() {
           setAvatarId(u.avatar)
           // Fetch as blob so auth cookie is sent (cross-port <img src> can't send cookies)
           fetch(`${DIRECTUS_URL}/assets/${u.avatar}?width=152&height=152&fit=cover`, { credentials: 'include' })
-            .then(r => r.blob())
+            .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.blob() })
             .then(b => setAvatarSrc(URL.createObjectURL(b)))
-            .catch(() => {})
+            .catch(err => console.warn('Avatar fetch failed:', err))
         }
       })
       .catch(() => router.replace('/login'))
