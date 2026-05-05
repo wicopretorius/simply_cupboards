@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { directus } from '@/lib/directus'
 import { readMe, updateMe, uploadFiles } from '@directus/sdk'
 import { BottomNav, Spinner } from '@/components/SharedUI'
+import { ensureSession } from '@/lib/auth'
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_DIRECTUS_URL ?? 'http://localhost:8055'
 
@@ -57,6 +58,7 @@ export default function ProfilePage() {
   const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase() || email[0]?.toUpperCase() || '?'
 
   useEffect(() => {
+    ensureSession().then(ok => { if (!ok) { router.replace('/login'); return } })
     directus.request(readMe({ fields: ['id', 'first_name', 'last_name', 'email', 'phone', 'avatar'] as any }))
       .then(me => {
         const u = me as unknown as Me

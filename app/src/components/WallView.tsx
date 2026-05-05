@@ -8,6 +8,7 @@ import {
   BottomNav, IconBtn,
   ChevronLeft, ChevronRight, DotsIcon, TrashIcon, ArrowLeftIcon, ArrowRightIcon,
 } from './SharedUI'
+import { ensureSession } from '@/lib/auth'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface WallCabinet {
@@ -175,6 +176,7 @@ export default function WallView({ designId }: { designId: number }) {
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
+      if (!await ensureSession()) { router.replace('/login'); return }
       try {
         const [des, cabs, palItems, fxs] = await Promise.all([
           directus.request(readItem('designs', designId, { fields: ['*'] })),

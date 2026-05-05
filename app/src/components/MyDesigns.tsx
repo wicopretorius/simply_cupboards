@@ -26,6 +26,7 @@ const ROOM_TYPES: { value: RoomType; label: string }[] = [
 import { BottomNav, BellIcon, SearchIcon, PlusIcon, IconBtn, Spinner } from './SharedUI'
 import { useRole } from '@/lib/useRole'
 import { atDesignLimit, upgradeMessage } from '@/lib/tiers'
+import { ensureSession } from '@/lib/auth'
 
 // ── Mini floor plan preview ───────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ export default function MyDesigns() {
 
   useEffect(() => {
     const load = async () => {
+      if (!await ensureSession()) { router.replace('/login'); return }
       try {
         const [me, items] = await Promise.all([
           directus.request(readMe()),

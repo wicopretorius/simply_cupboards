@@ -5,6 +5,7 @@ import { directus } from '@/lib/directus'
 import { readItem, readItems, createItem, updateItem, deleteItem } from '@directus/sdk'
 import type { Design, FloorFixture, PaletteItem, WallDef } from '@/lib/types'
 import { BottomNav, AppHeader, Spinner, TrashIcon, SaveIcon } from './SharedUI'
+import { ensureSession } from '@/lib/auth'
 
 const SVG_W      = 350
 const FALLBACK_D = 3000   // mm depth when no room_shape
@@ -176,6 +177,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
   // ── Load ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
+      if (!await ensureSession()) { router.replace('/login'); return }
       try {
         const [des, cabs, fxs] = await Promise.all([
           directus.request(readItem('designs', designId, { fields: ['*'] })),
