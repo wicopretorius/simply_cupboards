@@ -58,7 +58,7 @@ export default function Signup() {
       } else if (msg.toLowerCase().includes('not allowed') || msg.toLowerCase().includes('disabled')) {
         setError('Registration is currently disabled. Please contact support.')
       } else {
-        setError('Sign up failed. Please try again.')
+        setError(`Error: ${msg || JSON.stringify(err)}`)
       }
     } finally {
       setLoading(false)
