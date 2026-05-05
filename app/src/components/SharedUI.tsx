@@ -138,7 +138,7 @@ export const BottomNav = ({ designId }: { designId?: number } = {}) => {
   const navItems = [
     { base: '/designs',   href: '/designs',                                     icon: <HomeIcon />, label: 'Designs'    },
     { base: '/floor-plan', href: designId ? `/floor-plan/${designId}` : '/floor-plan', icon: <GridIcon />, label: 'Floorplan' },
-    { base: '/wall-view',  href: designId ? `/wall-view/${designId}`  : '/wall-view',  icon: <CupboardIcon />, label: 'Cupboards'  },
+    { base: '/wall-view',  href: designId ? `/wall-view/${designId}`  : '/floor-plan', icon: <CupboardIcon />, label: 'Cupboards'  },
     { base: '/profile',    href: '/profile',                                      icon: <UserIcon />, label: 'Profile' },
   ]
 
