@@ -5,6 +5,7 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$REPO_DIR"
 
 echo "==> Pulling latest code..."
+git clean -fd directus/snapshots/
 git pull
 
 # Load nvm
