@@ -1,7 +1,7 @@
-export type AppRole = 'Free' | 'User' | 'Designer' | 'Business' | 'Admin' | 'Administrator'
+export type AppRole = 'Free' | 'User' | 'Designer' | 'Business' | 'Client' | 'Admin' | 'Administrator'
 
 export const ROLE_RANK: Record<AppRole, number> = {
-  Free: 0, User: 1, Designer: 2, Business: 3, Admin: 4, Administrator: 4,
+  Free: 0, User: 1, Designer: 2, Business: 3, Client: 1, Admin: 4, Administrator: 4,
 }
 
 export type CabinetTab = 'Base Units' | 'Upper Units' | 'Tall Units' | 'Corner' | 'Appliances'

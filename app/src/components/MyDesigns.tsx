@@ -24,6 +24,8 @@ const ROOM_TYPES: { value: RoomType; label: string }[] = [
   { value: 'outbuilding', label: 'Outbuilding' },
 ]
 import { BottomNav, BellIcon, SearchIcon, PlusIcon, IconBtn, Spinner } from './SharedUI'
+import { useRole } from '@/lib/useRole'
+import { atDesignLimit, upgradeMessage } from '@/lib/tiers'
 
 // ── Mini floor plan preview ───────────────────────────────────────────────────
 
@@ -62,6 +64,7 @@ function MiniFloorPlan({ walls, wallMm }: { walls?: WallDef[]; wallMm: number })
 
 export default function MyDesigns() {
   const router  = useRouter()
+  const { role, isAdmin } = useRole()
   const [designs, setDesigns] = useState<Design[]>([])
   const [userEmail, setUserEmail] = useState('')
   const [loading, setLoading] = useState(true)
@@ -105,7 +108,13 @@ export default function MyDesigns() {
     load()
   }, [router])
 
-  const openDialog = () => { setNewName(''); setNewRoomType('kitchen'); setShowDialog(true) }
+  const openDialog = () => {
+    if (atDesignLimit(role, designs.length)) {
+      alert(upgradeMessage(role, 'designs'))
+      return
+    }
+    setNewName(''); setNewRoomType('kitchen'); setShowDialog(true)
+  }
 
   const createDesign = async () => {
     const name = newName.trim() || 'New Design'
@@ -144,6 +153,13 @@ export default function MyDesigns() {
         <div style={{ display: 'flex', gap: 8 }}>
           <IconBtn><SearchIcon /></IconBtn>
           <IconBtn><BellIcon /></IconBtn>
+          {isAdmin && (
+            <IconBtn onClick={() => router.push('/admin')}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </IconBtn>
+          )}
         </div>
       </div>
 
