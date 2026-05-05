@@ -2,28 +2,18 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { directus } from '@/lib/directus'
+import { registerUser } from '@directus/sdk'
 
-export default function Login() {
+export default function Signup() {
   const router = useRouter()
-  const [email, setEmail]       = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [showPw, setShowPw]     = useState(false)
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      await directus.login({ email, password })
-      router.replace('/designs')
-    } catch {
-      setError('Invalid email or password.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName]   = useState('')
+  const [email, setEmail]         = useState('')
+  const [password, setPassword]   = useState('')
+  const [confirm, setConfirm]     = useState('')
+  const [showPw, setShowPw]       = useState(false)
+  const [error, setError]         = useState('')
+  const [loading, setLoading]     = useState(false)
 
   const inp: React.CSSProperties = {
     width: '100%', padding: '14px 16px', borderRadius: 12,
@@ -31,11 +21,44 @@ export default function Login() {
     color: '#F2EDE6', fontSize: 14, outline: 'none',
   }
 
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (password !== confirm) {
+      setError('Passwords do not match.')
+      return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+    setLoading(true)
+    try {
+      await directus.request(registerUser(email, password, {
+        first_name: firstName,
+        last_name: lastName || undefined,
+      }))
+      await directus.login({ email, password })
+      router.replace('/designs')
+    } catch (err: any) {
+      const msg = err?.errors?.[0]?.message ?? err?.message ?? ''
+      if (msg.toLowerCase().includes('registered')) {
+        setError('An account with this email already exists.')
+      } else if (msg.toLowerCase().includes('not allowed') || msg.toLowerCase().includes('disabled')) {
+        setError('Registration is currently disabled. Please contact support.')
+      } else {
+        setError('Sign up failed. Please try again.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '0 28px' }}>
 
       {/* Header */}
-      <div style={{ paddingTop: 64, paddingBottom: 40, textAlign: 'center' }}>
+      <div style={{ paddingTop: 48, paddingBottom: 32, textAlign: 'center' }}>
         <img
           src="/logo.png"
           alt="Design My Cupboards"
@@ -44,7 +67,36 @@ export default function Login() {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+              First Name
+            </label>
+            <input
+              type="text"
+              value={firstName}
+              onChange={e => setFirstName(e.target.value)}
+              placeholder="Jane"
+              required
+              style={inp}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+              Last Name
+            </label>
+            <input
+              type="text"
+              value={lastName}
+              onChange={e => setLastName(e.target.value)}
+              placeholder="Smith"
+              style={inp}
+            />
+          </div>
+        </div>
+
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
             Email
@@ -68,7 +120,7 @@ export default function Login() {
               type={showPw ? 'text' : 'password'}
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="Min. 8 characters"
               required
               style={{ ...inp, paddingRight: 48 }}
             />
@@ -97,6 +149,20 @@ export default function Login() {
           </div>
         </div>
 
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+            Confirm Password
+          </label>
+          <input
+            type={showPw ? 'text' : 'password'}
+            value={confirm}
+            onChange={e => setConfirm(e.target.value)}
+            placeholder="••••••••"
+            required
+            style={inp}
+          />
+        </div>
+
         {error && (
           <div style={{ fontSize: 12, color: '#E05C5C', textAlign: 'center', padding: '8px 0' }}>
             {error}
@@ -112,43 +178,21 @@ export default function Login() {
             color: '#0F0F0E', fontSize: 15, fontWeight: 700,
             transition: 'opacity 0.15s',
             opacity: loading ? 0.7 : 1,
+            cursor: loading ? 'default' : 'pointer',
           }}
         >
-          {loading ? 'Signing in…' : 'Sign In'}
+          {loading ? 'Creating account…' : 'Create Account'}
         </button>
       </form>
 
-      {/* Divider */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '28px 0' }}>
-        <div style={{ flex: 1, height: 1, background: '#2A2825' }} />
-        <span style={{ fontSize: 12, color: '#4A4845' }}>or continue with</span>
-        <div style={{ flex: 1, height: 1, background: '#2A2825' }} />
-      </div>
-
-      {/* Social buttons (decorative) */}
-      <div style={{ display: 'flex', gap: 12 }}>
-        {['G', 'f', 'in'].map(label => (
-          <button
-            key={label}
-            style={{
-              flex: 1, padding: '12px 0', borderRadius: 12,
-              background: '#1A1917', border: '1px solid #3A3835',
-              color: '#6A6560', fontSize: 14, fontWeight: 600,
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {/* Footer */}
       <div style={{ marginTop: 24, paddingBottom: 40, textAlign: 'center' }}>
-        <span style={{ fontSize: 13, color: '#4A4845' }}>Don't have an account? </span>
+        <span style={{ fontSize: 13, color: '#4A4845' }}>Already have an account? </span>
         <button
-          onClick={() => router.push('/signup')}
+          onClick={() => router.push('/login')}
           style={{ background: 'none', border: 'none', color: '#C8A96E', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
         >
-          Sign up
+          Sign in
         </button>
       </div>
     </div>
