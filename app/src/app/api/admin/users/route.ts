@@ -8,7 +8,7 @@ const FIELDS = [
   'role.id', 'role.name',
   'subscription_start_date', 'subscription_end_date',
   'subscription_months', 'subscription_indefinite',
-  'date_created',
+  'last_access',
 ].join(',')
 
 export async function GET() {
