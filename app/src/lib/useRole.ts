@@ -27,7 +27,7 @@ export function useRole(): RoleState {
   return {
     role,
     loading,
-    isAdmin: role === 'Admin',
+    isAdmin: role === 'Admin' || role === 'Administrator',
     atLeast: (required: AppRole) =>
       role !== null && ROLE_RANK[role] >= ROLE_RANK[required],
   }
