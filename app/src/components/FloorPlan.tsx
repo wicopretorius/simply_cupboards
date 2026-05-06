@@ -195,8 +195,9 @@ export default function FloorPlan({ designId }: { designId: number }) {
         setBases(arr.filter(c => c.row === 'base').map(c => (c.palette_item_id as PaletteItem).width_mm))
         setUppers(arr.filter(c => c.row === 'upper').map(c => (c.palette_item_id as PaletteItem).width_mm))
         setFixes((fxs as FloorFixture[]).map(f => ({ dbId: f.id, iid: uid(), type: f.type, x: f.x, y: f.y, rotation: f.rotation ?? 0, mirrored: f.mirrored ?? false })))
-      } catch {
-        router.replace('/login')
+      } catch (err: any) {
+        const status = err?.response?.status ?? err?.status
+        router.replace(status === 403 ? '/designs' : '/login')
       } finally {
         setLoading(false)
       }

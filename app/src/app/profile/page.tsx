@@ -144,6 +144,7 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     try { await directus.logout() } catch { /* ignore — still redirect */ }
+    localStorage.removeItem('last_sel_id')
     router.replace('/login')
   }
 

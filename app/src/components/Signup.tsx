@@ -50,6 +50,7 @@ export default function Signup() {
         throw new Error(json.errors?.[0]?.message ?? 'Registration failed')
       }
       await directus.login({ email, password })
+      localStorage.removeItem('last_sel_id')
       router.replace('/designs')
     } catch (err: any) {
       const msg = err?.message ?? ''

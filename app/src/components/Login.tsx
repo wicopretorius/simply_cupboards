@@ -17,6 +17,7 @@ export default function Login() {
     setLoading(true)
     try {
       await directus.login({ email, password })
+      localStorage.removeItem('last_sel_id')
       router.replace('/designs')
     } catch {
       setError('Invalid email or password.')
