@@ -474,13 +474,9 @@ export default function FloorPlan({ designId }: { designId: number }) {
               {fixes.filter(fx => fx.type in SZ).map(fx => {
                 const [szW, szH] = SZ[fx.type]
                 const fw = fx.widthMm ?? szW
-                const rawFh = fx.type === 'window' ? 150 : szH
-                // Swap dimensions for 90°/270° so window becomes tall
-                const isTall = (fx.rotation ?? 0) === 90 || (fx.rotation ?? 0) === 270
-                const fh = isTall ? fw : rawFh
-                const effectiveW = isTall ? rawFh : fw
+                const fh = fx.type === 'window' ? 150 : szH
                 const sp = mmToSvg(fx.x, fx.y)
-                const pw = effectiveW * sc, ph = fh * sc
+                const pw = fw * sc, ph = fh * sc
                 const cx = sp.x + pw / 2, cy = sp.y + ph / 2
                 const isSelected = sel === fx.iid
                 const rot = fx.rotation ?? 0
