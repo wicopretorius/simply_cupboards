@@ -6,6 +6,7 @@ import { readItem, updateItem } from '@directus/sdk'
 import type { CSSProperties } from 'react'
 import type { WallDef, RoomDef, Design } from '@/lib/types'
 import { AppHeader } from './SharedUI'
+import { ensureSession } from '@/lib/auth'
 
 const SVG_W = 340
 const SVG_H = 230
@@ -70,6 +71,7 @@ export default function RoomBuilder({ designId, returnTo = 'wall-view' }: { desi
   const [walls, setWalls]       = useState<WallDef[]>([{ id: uid(), lengthMm: 4200, angleDeg: 0 }])
   const [selId, setSelId]       = useState<string | null>(null)
   const [saving, setSaving]     = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [isClosed, setIsClosed] = useState(false)
   const [heightMm, setHeightMm] = useState(2400)
   const [heightStr, setHeightStr] = useState('2400')
@@ -78,6 +80,8 @@ export default function RoomBuilder({ designId, returnTo = 'wall-view' }: { desi
 
   useEffect(() => {
     const load = async () => {
+      const ok = await ensureSession()
+      if (!ok) { router.replace('/login'); return }
       try {
         const d = await directus.request(readItem('designs', designId, { fields: ['*'] as any }))
         const des = d as unknown as Design
@@ -88,7 +92,7 @@ export default function RoomBuilder({ designId, returnTo = 'wall-view' }: { desi
       } catch {}
     }
     load()
-  }, [designId])
+  }, [designId, router])
 
   const rawVerts = useMemo(() => computeVerts(walls), [walls])
   
@@ -136,6 +140,7 @@ export default function RoomBuilder({ designId, returnTo = 'wall-view' }: { desi
   }, [walls])
 
   const handleDone = async () => {
+    setSaveError('')
     setSaving(true)
     try {
       const finalWalls = isClosed ? displayWalls : walls
@@ -148,6 +153,9 @@ export default function RoomBuilder({ designId, returnTo = 'wall-view' }: { desi
         badge: 'In Progress',
       }))
       router.push(`/${returnTo}/${designId}`)
+    } catch (err: any) {
+      console.error('handleDone error:', err)
+      setSaveError('Failed to save — please try again')
     } finally {
       setSaving(false)
     }
@@ -188,6 +196,12 @@ export default function RoomBuilder({ designId, returnTo = 'wall-view' }: { desi
           </button>
         }
       />
+
+      {saveError && (
+        <div style={{ margin: '8px 20px 0', padding: '8px 12px', borderRadius: 8, background: 'rgba(224,92,92,0.1)', border: '1px solid rgba(224,92,92,0.3)', fontSize: 12, color: '#E05C5C', textAlign: 'center' }}>
+          {saveError}
+        </div>
+      )}
 
       {/* SVG canvas */}
       <div style={{ padding: '12px 20px 8px', flexShrink: 0 }}>
