@@ -468,6 +468,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
                 const isRotatedV = (fx.rotation ?? 0) === 90 || (fx.rotation ?? 0) === 270
                 const fh = isRotatedV ? fw : rawFh
                 const effectiveW = isRotatedV ? rawFh : fw
+                const isTall = isRotatedV
                 const sp = mmToSvg(fx.x, fx.y)
                 const pw = effectiveW * sc, ph = fh * sc
                 const cx = sp.x + pw / 2, cy = sp.y + ph / 2
@@ -547,10 +548,10 @@ export default function FloorPlan({ designId }: { designId: number }) {
                     )}
                     {fx.type === 'window' && (
                       <line
-                        x1={isRotatedV ? cx : sp.x + pw * 0.1}
-                        y1={isRotatedV ? sp.y + ph * 0.1 : cy}
-                        x2={isRotatedV ? cx : sp.x + pw * 0.9}
-                        y2={isRotatedV ? sp.y + ph * 0.9 : cy}
+                        x1={isTall ? cx : sp.x + pw * 0.1}
+                        y1={isTall ? sp.y + ph * 0.1 : cy}
+                        x2={isTall ? cx : sp.x + pw * 0.9}
+                        y2={isTall ? sp.y + ph * 0.9 : cy}
                         stroke="#A07840" strokeWidth={1.5}
                         style={{ pointerEvents: 'none' }} />
                     )}
