@@ -18,12 +18,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={dmSans.className}>
         <div style={{
           width: '100%',
-          minHeight: '100dvh',
+          maxWidth: 430,
+          height: '100dvh',
           background: '#0F0F0E',
           color: '#F2EDE6',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
+          overflow: 'hidden',
         }}>
           {children}
         </div>
