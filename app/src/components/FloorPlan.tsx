@@ -163,6 +163,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
   const svgRef   = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const fixRef   = useRef<LFix[]>([])
+  const selRef   = useRef<string | null>(null)
 
   const [design,  setDesign]  = useState<Design | null>(null)
   const [bases,   setBases]   = useState<number[]>([])
@@ -181,6 +182,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
   const [availableH, setAvailableH] = useState(400)
 
   fixRef.current = fixes
+  selRef.current = sel
 
   // ── Auto-scale to fit ────────────────────────────────────────────────────
   useEffect(() => {
@@ -278,16 +280,17 @@ export default function FloorPlan({ designId }: { designId: number }) {
 
   // ── Adjust rotation by delta degrees ────────────────────────────────────
   const adjustRotation = useCallback((delta: number) => {
-    const fx = fixRef.current.find(f => f.iid === sel)
-    if (!fx) return
-    const newRot = ((fx.rotation + delta) % 360 + 360) % 360
-    setFixes(p => p.map(f => f.iid === sel ? { ...f, rotation: newRot } : f))
-    if (fx.dbId) {
-      setSaving(true)
-      directus.request(updateItem('floor_fixtures', fx.dbId, { rotation: newRot }))
-        .finally(() => setSaving(false))
-    }
-  }, [sel])
+    setFixes(prev => {
+      const fx = prev.find(f => f.iid === selRef.current)
+      if (!fx) return prev
+      const newRot = ((fx.rotation + delta) % 360 + 360) % 360
+      if (fx.dbId) {
+        directus.request(updateItem('floor_fixtures', fx.dbId, { rotation: newRot }))
+          .catch(console.error)
+      }
+      return prev.map(f => f.iid === selRef.current ? { ...f, rotation: newRot } : f)
+    })
+  }, [])
 
   const startRotHold = useCallback((delta: number) => {
     adjustRotation(delta)
@@ -489,8 +492,12 @@ export default function FloorPlan({ designId }: { designId: number }) {
                   <g key={fx.iid}
                     onPointerDown={e => handlePointerDown(e, fx.iid)}
                     onClick={e => e.stopPropagation()}
-                    style={{ cursor: isSelected ? 'grab' : 'pointer' }}
-                    transform={`rotate(${rot},${cx},${cy})`}
+                    style={{
+                      cursor: isSelected ? 'grab' : 'pointer',
+                      transformBox: 'fill-box',
+                      transformOrigin: 'center',
+                      transform: `rotate(${rot}deg)`,
+                    }}
                   >
                     {/* Invisible hit area (centred, covers rotated bounds) */}
                     <rect
@@ -554,10 +561,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
                     )}
                     {fx.type === 'window' && (
                       <line
-                        x1={isTall ? cx : sp.x + pw * 0.1}
-                        y1={isTall ? sp.y + ph * 0.1 : cy}
-                        x2={isTall ? cx : sp.x + pw * 0.9}
-                        y2={isTall ? sp.y + ph * 0.9 : cy}
+                        x1={sp.x + pw * 0.1} y1={cy}
+                        x2={sp.x + pw * 0.9} y2={cy}
                         stroke="#A07840" strokeWidth={1.5}
                         style={{ pointerEvents: 'none' }} />
                     )}
