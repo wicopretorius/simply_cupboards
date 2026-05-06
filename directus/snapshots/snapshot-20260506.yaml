@@ -512,6 +512,46 @@ fields:
       has_auto_increment: false
       foreign_key_table: null
       foreign_key_column: null
+  - collection: designs
+    field: wall_height_mm
+    type: integer
+    meta:
+      collection: designs
+      conditions: null
+      display: raw
+      display_options: null
+      field: wall_height_mm
+      group: null
+      hidden: false
+      interface: input
+      note: Wall height in mm
+      options: null
+      readonly: false
+      required: false
+      searchable: true
+      sort: 11
+      special: null
+      translations: null
+      validation: null
+      validation_message: null
+      width: full
+    schema:
+      name: wall_height_mm
+      table: designs
+      data_type: int
+      default_value: 2400
+      max_length: null
+      numeric_precision: 10
+      numeric_scale: 0
+      is_nullable: true
+      is_unique: false
+      is_indexed: false
+      is_primary_key: false
+      is_generated: false
+      generation_expression: null
+      has_auto_increment: false
+      foreign_key_table: null
+      foreign_key_column: null
   - collection: floor_fixtures
     field: id
     type: integer
