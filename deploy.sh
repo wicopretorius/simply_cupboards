@@ -6,6 +6,7 @@ cd "$REPO_DIR"
 
 echo "==> Pulling latest code..."
 git clean -fd directus/snapshots/
+git checkout -- directus/snapshots/ 2>/dev/null || true
 git pull
 
 # Load nvm
