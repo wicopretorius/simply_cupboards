@@ -648,7 +648,6 @@ export default function FloorPlan({ designId }: { designId: number }) {
                         fill="none"
                         stroke="rgba(242,237,230,0.85)"
                         strokeWidth={1.5}
-                        strokeDasharray="5 3"
                         rx={5}
                         style={{ pointerEvents: 'none' }}
                       />
