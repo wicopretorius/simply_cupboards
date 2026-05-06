@@ -34,6 +34,13 @@ const SA_WIN_HEIGHTS: { label: string; mm: number }[] = [
 
 const uid = () => Math.random().toString(36).slice(2, 9)
 
+// Axis-aligned bounding box of a rotated rectangle
+function effectiveBbox(fw: number, fh: number, rotDeg: number) {
+  const rad = (rotDeg * Math.PI) / 180
+  const c = Math.abs(Math.cos(rad)), s = Math.abs(Math.sin(rad))
+  return { eW: fw * c + fh * s, eH: fw * s + fh * c }
+}
+
 // ── Geometry ─────────────────────────────────────────────────────────────────
 
 export interface RoomGeometry {
@@ -174,6 +181,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
   const [availableH, setAvailableH] = useState(400)
 
   fixRef.current = fixes
+  const geoRef = useRef(geo)
+  geoRef.current = geo
 
   // ── Auto-scale to fit ────────────────────────────────────────────────────
   useEffect(() => {
@@ -274,10 +283,20 @@ export default function FloorPlan({ designId }: { designId: number }) {
     const fx = fixRef.current.find(f => f.iid === sel)
     if (!fx) return
     const newRot = ((fx.rotation + delta) % 360 + 360) % 360
-    setFixes(p => p.map(f => f.iid === sel ? { ...f, rotation: newRot } : f))
+    // Re-clamp position so the rotated fixture stays fully inside the room
+    const [szW, szH] = SZ[fx.type]
+    const fw = fx.widthMm ?? szW
+    const fh = fx.type === 'window' ? 150 : szH
+    const { eW, eH } = effectiveBbox(fw, fh, newRot)
+    const { bboxW, bboxH } = geoRef.current
+    const cx = Math.max(eW / 2, Math.min(bboxW - eW / 2, fx.x + fw / 2))
+    const cy = Math.max(eH / 2, Math.min(bboxH - eH / 2, fx.y + fh / 2))
+    const newX = cx - fw / 2
+    const newY = cy - fh / 2
+    setFixes(p => p.map(f => f.iid === sel ? { ...f, rotation: newRot, x: newX, y: newY } : f))
     if (fx.dbId) {
       setSaving(true)
-      directus.request(updateItem('floor_fixtures', fx.dbId, { rotation: newRot }))
+      directus.request(updateItem('floor_fixtures', fx.dbId, { rotation: newRot, x: newX, y: newY }))
         .finally(() => setSaving(false))
     }
   }, [sel])
@@ -285,8 +304,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
   const startRotHold = useCallback((delta: number) => {
     adjustRotation(delta)
     rotHoldTimeout.current = setTimeout(() => {
-      rotHoldInterval.current = setInterval(() => adjustRotation(delta * 10), 120)
-    }, 400)
+      rotHoldInterval.current = setInterval(() => adjustRotation(delta), 80)
+    }, 350)
   }, [adjustRotation])
 
   const stopRotHold = useCallback(() => {
@@ -321,6 +340,10 @@ export default function FloorPlan({ designId }: { designId: number }) {
     const fw = fx0.widthMm ?? szW
     const fh = fx0.type === 'window' ? 150 : szH
     const { sc, bboxW, bboxH } = geo
+    // Constrain the centre of the fixture using the rotated bounding box
+    const { eW, eH } = effectiveBbox(fw, fh, fx0.rotation)
+    const cx0 = fx0.x + fw / 2
+    const cy0 = fx0.y + fh / 2
     let moved = false
 
     const onMove = (ev: PointerEvent) => {
@@ -335,9 +358,9 @@ export default function FloorPlan({ designId }: { designId: number }) {
       const dmx = (cp.x - sp.x) / sc
       const dmy = (cp.y - sp.y) / sc
 
-      const nx = Math.max(0, Math.min(bboxW - fw, fx0.x + dmx))
-      const ny = Math.max(0, Math.min(bboxH - fh, fx0.y + dmy))
-      setFixes(p => p.map(f => f.iid === iid ? { ...f, x: nx, y: ny } : f))
+      const newCx = Math.max(eW / 2, Math.min(bboxW - eW / 2, cx0 + dmx))
+      const newCy = Math.max(eH / 2, Math.min(bboxH - eH / 2, cy0 + dmy))
+      setFixes(p => p.map(f => f.iid === iid ? { ...f, x: newCx - fw / 2, y: newCy - fh / 2 } : f))
     }
 
     const onUp = () => {
