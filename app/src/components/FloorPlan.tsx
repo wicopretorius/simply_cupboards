@@ -181,8 +181,6 @@ export default function FloorPlan({ designId }: { designId: number }) {
   const [availableH, setAvailableH] = useState(400)
 
   fixRef.current = fixes
-  const geoRef = useRef(geo)
-  geoRef.current = geo
 
   // ── Auto-scale to fit ────────────────────────────────────────────────────
   useEffect(() => {
@@ -209,6 +207,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
     }
     return baseGeo
   }, [design, availableH])
+  const geoRef = useRef(geo)
+  geoRef.current = geo
 
   // ── Load ─────────────────────────────────────────────────────────────────
   useEffect(() => {
