@@ -477,7 +477,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
                 return (
                   <g key={fx.iid}
                     onPointerDown={e => handlePointerDown(e, fx.iid)}
-                    style={{ cursor: 'grab' }}
+                    onClick={e => e.stopPropagation()}
+                    style={{ cursor: isSelected ? 'grab' : 'pointer' }}
                     transform={rot ? `rotate(${rot},${cx},${cy})` : undefined}
                   >
                     {/* Invisible hit area (centred, covers rotated bounds) */}
@@ -638,6 +639,20 @@ export default function FloorPlan({ designId }: { designId: number }) {
                       style={{ pointerEvents: 'none', userSelect: 'none' }}>
                       {LBL[fx.type]}
                     </text>
+
+                    {/* Selection ring */}
+                    {isSelected && (
+                      <rect
+                        x={sp.x - 5} y={sp.y - 5}
+                        width={pw + 10} height={ph + 10}
+                        fill="none"
+                        stroke="rgba(242,237,230,0.85)"
+                        strokeWidth={1.5}
+                        strokeDasharray="5 3"
+                        rx={5}
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    )}
                   </g>
                 )
               })}
@@ -806,7 +821,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
             </button>
           </div>
           <p style={{ fontSize: 11, color: '#6A6560', marginTop: 8, textAlign: 'center', visibility: sel ? 'visible' : 'hidden' }}>
-            Hold to drag · tap trash to remove
+            Drag to move · ◁ ▷ to rotate · trash to delete
           </p>
         </div>
           )
