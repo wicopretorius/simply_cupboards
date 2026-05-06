@@ -219,7 +219,15 @@ export default function FloorPlan({ designId }: { designId: number }) {
     setSel(fix.iid)
     setSaving(true)
     directus.request(createItem('floor_fixtures', { design_id: designId, type: addType, x: fix.x, y: fix.y, rotation: 0, mirrored: false }))
-      .then(r => setFixes(p => p.map(f => f.iid === fix.iid ? { ...f, dbId: (r as FloorFixture).id } : f)))
+      .then(r => {
+        const newId = (r as FloorFixture).id
+        setFixes(p => p.map(f => f.iid === fix.iid ? { ...f, dbId: newId } : f))
+        // Flush any rotation/position changes that happened before dbId was known
+        const current = fixRef.current.find(f => f.iid === fix.iid)
+        if (current && (current.rotation !== 0 || current.mirrored || current.x !== fix.x || current.y !== fix.y)) {
+          directus.request(updateItem('floor_fixtures', newId, { x: current.x, y: current.y, rotation: current.rotation, mirrored: current.mirrored })).catch(console.error)
+        }
+      })
       .finally(() => setSaving(false))
   }, [addType, designId, geo])
 
