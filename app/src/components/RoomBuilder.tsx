@@ -301,8 +301,9 @@ export default function RoomBuilder({ designId, returnTo = 'wall-view' }: { desi
               <circle key={i} cx={pt.x} cy={pt.y} r={4} fill="#3A3835" stroke="#5A5550" strokeWidth={1} />
             ))}
 
-            {/* Start vertex */}
-            <circle cx={startPt.x} cy={startPt.y} r={5} fill="#C8A96E" />
+            {/* Origin marker */}
+            <circle cx={startPt.x} cy={startPt.y} r={7} fill="#1A1917" stroke="#C8A96E" strokeWidth={2} />
+            <circle cx={startPt.x} cy={startPt.y} r={3} fill="#C8A96E" />
 
             {/* End vertex */}
             <circle cx={endPt.x} cy={endPt.y} r={4} fill="#3A3835" stroke="#5A5550" strokeWidth={1} />
@@ -314,21 +315,13 @@ export default function RoomBuilder({ designId, returnTo = 'wall-view' }: { desi
                 <text x={endPlus.x} y={endPlus.y + 6} textAnchor="middle" fontSize={20} fill="#C8A96E" style={{ userSelect: 'none' }}>+</text>
               </g>
             )}
-
-            {/* + at start (only when not close to end) */}
-            {!isClosed && endsDist > 40 && (
-              <g onClick={e => { e.stopPropagation(); addAtStart() }} style={{ cursor: 'pointer' }}>
-                <circle cx={startPlus.x} cy={startPlus.y} r={13} fill="#1A1917" stroke="#C8A96E" strokeWidth={1.5} />
-                <text x={startPlus.x} y={startPlus.y + 6} textAnchor="middle" fontSize={20} fill="#C8A96E" style={{ userSelect: 'none' }}>+</text>
-              </g>
-            )}
           </svg>
 
           {/* Legend */}
           <div style={{ padding: '6px 14px 10px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#C8A96E' }} />
-              <span style={{ fontSize: 10, color: '#6A6560' }}>Start</span>
+              <span style={{ fontSize: 10, color: '#6A6560' }}>Origin</span>
             </div>
             
             <button
