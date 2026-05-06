@@ -506,7 +506,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
                     onPointerDown={e => handlePointerDown(e, fx.iid)}
                     onClick={e => e.stopPropagation()}
                     style={{ cursor: isSelected ? 'grab' : 'pointer' }}
-                    transform={rot ? `rotate(${rot},${cx},${cy})` : undefined}
+                    transform={`rotate(${rot},${cx},${cy})`}
                   >
                     {/* Invisible hit area (centred, covers rotated bounds) */}
                     <rect
