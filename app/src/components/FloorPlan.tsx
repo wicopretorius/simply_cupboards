@@ -463,9 +463,13 @@ export default function FloorPlan({ designId }: { designId: number }) {
               {fixes.filter(fx => fx.type in SZ).map(fx => {
                 const [szW, szH] = SZ[fx.type]
                 const fw = fx.widthMm ?? szW
-                const fh = fx.type === 'window' ? 150 : szH
+                const rawFh = fx.type === 'window' ? 150 : szH
+                // Swap dimensions for 90°/270° rotation
+                const isRotatedV = (fx.rotation ?? 0) === 90 || (fx.rotation ?? 0) === 270
+                const fh = isRotatedV ? fw : rawFh
+                const effectiveW = isRotatedV ? rawFh : fw
                 const sp = mmToSvg(fx.x, fx.y)
-                const pw = fw * sc, ph = fh * sc
+                const pw = effectiveW * sc, ph = fh * sc
                 const cx = sp.x + pw / 2, cy = sp.y + ph / 2
                 const isSelected = sel === fx.iid
                 const rot = fx.rotation ?? 0
@@ -542,7 +546,11 @@ export default function FloorPlan({ designId }: { designId: number }) {
                       </g>
                     )}
                     {fx.type === 'window' && (
-                      <line x1={sp.x + pw * 0.1} y1={cy} x2={sp.x + pw * 0.9} y2={cy}
+                      <line
+                        x1={isRotatedV ? cx : sp.x + pw * 0.1}
+                        y1={isRotatedV ? sp.y + ph * 0.1 : cy}
+                        x2={isRotatedV ? cx : sp.x + pw * 0.9}
+                        y2={isRotatedV ? sp.y + ph * 0.9 : cy}
                         stroke="#A07840" strokeWidth={1.5}
                         style={{ pointerEvents: 'none' }} />
                     )}
