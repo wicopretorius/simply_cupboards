@@ -471,8 +471,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
                 const rot = fx.rotation ?? 0
                 const mirrored = fx.mirrored ?? false
 
-                // Hit area covers rotated bounding box — use max dimension for safety
-                const maxDim = Math.max(pw, ph) + 24
+                // Hit area — minimal padding to avoid overlapping other fixtures
+                const maxDim = Math.max(pw, ph) + 8
 
                 return (
                   <g key={fx.iid}
