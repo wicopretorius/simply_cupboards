@@ -54,7 +54,7 @@ export default function AdminPanel() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          role: editing.role?.id,
+          ...(editing.role?.name !== 'Administrator' && { role: editing.role?.id }),
           subscription_start_date: editing.subscription_start_date || null,
           subscription_end_date: editing.subscription_end_date || null,
           subscription_months: editing.subscription_months || null,
@@ -179,11 +179,18 @@ export default function AdminPanel() {
 
             {/* Role */}
             <label style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: 6 }}>Role</label>
-            <select value={editing.role?.name ?? ''} onChange={e => setEditing(prev => prev ? {
-              ...prev, role: { id: ROLE_IDS[e.target.value], name: e.target.value }
-            } : null)} style={{ ...inp, marginBottom: 14 }}>
-              {ALL_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+            {editing.role?.name === 'Administrator' ? (
+              <div style={{ ...inp, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, color: '#E05C5C' }}>
+                <span style={{ fontWeight: 700 }}>Administrator</span>
+                <span style={{ fontSize: 11, color: '#6A6560', marginLeft: 4 }}>— manage in Directus only</span>
+              </div>
+            ) : (
+              <select value={editing.role?.name ?? ''} onChange={e => setEditing(prev => prev ? {
+                ...prev, role: { id: ROLE_IDS[e.target.value], name: e.target.value }
+              } : null)} style={{ ...inp, marginBottom: 14 }}>
+                {ALL_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            )}
 
             {/* Subscription dates */}
             <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
