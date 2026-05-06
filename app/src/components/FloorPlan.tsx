@@ -14,7 +14,23 @@ const CAB_UPPER_D = 300
 const PAD        = 24     // SVG padding in px
 
 type FType = FloorFixture['type']
-interface LFix { dbId: number | null; iid: string; type: FType; x: number; y: number; rotation: number; mirrored: boolean }
+interface LFix { dbId: number | null; iid: string; type: FType; x: number; y: number; rotation: number; mirrored: boolean; widthMm?: number; heightMm?: number }
+
+const SA_WIN_WIDTHS = [305, 533, 1022, 1511, 2000, 2489]
+const SA_WIN_HEIGHTS: { label: string; mm: number }[] = [
+  { label: 'G-Type',     mm: 359  },
+  { label: 'E-Type',     mm: 654  },
+  { label: 'C-Type',     mm: 949  },
+  { label: 'D-Type',     mm: 1245 },
+  { label: 'D50-Type',   mm: 1540 },
+  { label: 'D/S-Type',   mm: 1264 },
+  { label: 'D50/S-Type', mm: 1559 },
+  { label: 'G/C-Type',   mm: 1264 },
+  { label: 'G/D-Type',   mm: 1559 },
+  { label: 'G/D50-Type', mm: 1854 },
+  { label: 'E/C-Type',   mm: 1559 },
+  { label: 'E/D-Type',   mm: 1854 },
+]
 
 const uid = () => Math.random().toString(36).slice(2, 9)
 
@@ -151,8 +167,10 @@ export default function FloorPlan({ designId }: { designId: number }) {
   const draggingRef           = useRef<string | null>(null)
   const rotHoldTimeout        = useRef<ReturnType<typeof setTimeout> | null>(null)
   const rotHoldInterval       = useRef<ReturnType<typeof setInterval> | null>(null)
-  const [addType, setAddType] = useState<FType>('window')
-  const [palTab,  setPalTab]  = useState(0)
+  const [addType,    setAddType]    = useState<FType>('window')
+  const [palTab,     setPalTab]     = useState(0)
+  const [winWidth,   setWinWidth]   = useState(1022)
+  const [winHeight,  setWinHeight]  = useState(654)
   const [availableH, setAvailableH] = useState(400)
 
   fixRef.current = fixes
@@ -203,7 +221,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
         const arr = cabs as any[]
         setBases(arr.filter(c => c.row === 'base').map(c => (c.palette_item_id as PaletteItem).width_mm))
         setUppers(arr.filter(c => c.row === 'upper').map(c => (c.palette_item_id as PaletteItem).width_mm))
-        setFixes((fxs as FloorFixture[]).map(f => ({ dbId: f.id, iid: uid(), type: f.type, x: f.x, y: f.y, rotation: f.rotation ?? 0, mirrored: f.mirrored ?? false })))
+        setFixes((fxs as FloorFixture[]).map(f => ({ dbId: f.id, iid: uid(), type: f.type, x: f.x, y: f.y, rotation: f.rotation ?? 0, mirrored: f.mirrored ?? false, widthMm: f.width_mm ?? undefined, heightMm: f.height_mm ?? undefined })))
       } catch (err: any) {
         const status = err?.response?.status ?? err?.status
         router.replace(status === 403 ? '/designs' : '/login')
@@ -216,18 +234,20 @@ export default function FloorPlan({ designId }: { designId: number }) {
 
   // ── Add fixture ───────────────────────────────────────────────────────────
   const addFixture = useCallback(() => {
-    const [fw, fh] = SZ[addType]
+    const isWin = addType === 'window'
+    const fw = isWin ? winWidth  : SZ[addType][0]
+    const fh = isWin ? 150       : SZ[addType][1]
     const fix: LFix = {
       dbId: null, iid: uid(), type: addType,
       x: Math.max(0, (geo.bboxW - fw) / 2),
       y: Math.max(0, (geo.bboxH - fh) / 2),
-      rotation: 0,
-      mirrored: false,
+      rotation: 0, mirrored: false,
+      ...(isWin ? { widthMm: winWidth, heightMm: winHeight } : {}),
     }
     setFixes(p => [...p, fix])
     setSel(fix.iid)
     setSaving(true)
-    directus.request(createItem('floor_fixtures', { design_id: designId, type: addType, x: fix.x, y: fix.y, rotation: 0, mirrored: false }))
+    directus.request(createItem('floor_fixtures', { design_id: designId, type: addType, x: fix.x, y: fix.y, rotation: 0, mirrored: false, ...(isWin ? { width_mm: winWidth, height_mm: winHeight } : {}) }))
       .then(r => {
         const newId = (r as FloorFixture).id
         setFixes(p => p.map(f => f.iid === fix.iid ? { ...f, dbId: newId } : f))
@@ -297,7 +317,9 @@ export default function FloorPlan({ designId }: { designId: number }) {
     const svg = svgRef.current!
     const sp  = toSvgPt(svg, e.clientX, e.clientY)
     const fx0 = fixRef.current.find(f => f.iid === iid)!
-    const [fw, fh] = SZ[fx0.type]
+    const [szW, szH] = SZ[fx0.type]
+    const fw = fx0.widthMm ?? szW
+    const fh = fx0.type === 'window' ? 150 : szH
     const { sc, bboxW, bboxH } = geo
     let moved = false
 
@@ -439,7 +461,9 @@ export default function FloorPlan({ designId }: { designId: number }) {
 
               {/* Fixtures */}
               {fixes.filter(fx => fx.type in SZ).map(fx => {
-                const [fw, fh] = SZ[fx.type]
+                const [szW, szH] = SZ[fx.type]
+                const fw = fx.widthMm ?? szW
+                const fh = fx.type === 'window' ? 150 : szH
                 const sp = mmToSvg(fx.x, fx.y)
                 const pw = fw * sc, ph = fh * sc
                 const cx = sp.x + pw / 2, cy = sp.y + ph / 2
@@ -671,7 +695,42 @@ export default function FloorPlan({ designId }: { designId: number }) {
               </button>
             ))}
           </div>
-          {/* Fixture buttons for active tab */}
+          {/* Fixture buttons or SA window picker */}
+          {activeTab?.label === 'Windows' ? (
+            <div style={{ marginBottom: 10 }}>
+              {/* Height row */}
+              <div style={{ fontSize: 10, color: '#6A6560', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>Height</div>
+              <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4, marginBottom: 8 }}>
+                {SA_WIN_HEIGHTS.map(h => (
+                  <button key={h.label} onClick={() => setWinHeight(h.mm)} style={{
+                    flexShrink: 0, padding: '6px 8px', borderRadius: 8,
+                    background: winHeight === h.mm ? 'rgba(200,169,110,0.18)' : '#242220',
+                    border: `1px solid ${winHeight === h.mm ? '#C8A96E' : '#3A3835'}`,
+                    color: winHeight === h.mm ? '#C8A96E' : '#6A6560',
+                    fontSize: 10, fontWeight: 600,
+                  }}>
+                    <div>{h.label}</div>
+                    <div style={{ fontSize: 9, opacity: 0.7 }}>{h.mm}mm</div>
+                  </button>
+                ))}
+              </div>
+              {/* Width row */}
+              <div style={{ fontSize: 10, color: '#6A6560', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 5 }}>Width</div>
+              <div style={{ display: 'flex', gap: 5, overflowX: 'auto', paddingBottom: 4 }}>
+                {SA_WIN_WIDTHS.map(w => (
+                  <button key={w} onClick={() => setWinWidth(w)} style={{
+                    flexShrink: 0, padding: '6px 10px', borderRadius: 8,
+                    background: winWidth === w ? 'rgba(200,169,110,0.18)' : '#242220',
+                    border: `1px solid ${winWidth === w ? '#C8A96E' : '#3A3835'}`,
+                    color: winWidth === w ? '#C8A96E' : '#6A6560',
+                    fontSize: 11, fontWeight: 600,
+                  }}>
+                    {w}mm
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
             {tabTypes.map(t => (
               <button key={t} onClick={() => setAddType(t)} style={{
@@ -685,6 +744,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
               </button>
             ))}
           </div>
+          )}
           {/* Rotation / mirror row — always rendered to avoid layout shift */}
           {(() => {
             const selFx = fixes.find(f => f.iid === sel)
@@ -733,7 +793,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
               background: 'linear-gradient(135deg,#C8A96E,#A07840)',
               color: '#0F0F0E', fontSize: 13, fontWeight: 700,
             }}>
-              + Place {LBL[addType]}
+              + Place {addType === 'window' ? `Window ${winWidth}×${winHeight}mm` : LBL[addType]}
             </button>
             {/* Trash — always rendered to avoid layout shift */}
             <button onClick={removeSel} style={{
