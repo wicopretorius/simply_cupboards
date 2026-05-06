@@ -541,7 +541,21 @@ export default function WallView({ designId }: { designId: number }) {
           <IconBtn onClick={() => moveSelected(-1)}><ChevronLeft /></IconBtn>
           <IconBtn onClick={() => moveSelected(1)}><ChevronRight /></IconBtn>
         </div>
-        <IconBtn><DotsIcon /></IconBtn>
+        <button
+          onClick={async () => {
+            try {
+              await directus.request(updateItem('designs', designId, { badge: 'Complete' } as any))
+            } catch {}
+            router.push(`/floor-plan/${designId}`)
+          }}
+          style={{
+            padding: '7px 14px', borderRadius: 8, border: 'none',
+            background: 'linear-gradient(135deg,#C8A96E,#A07840)',
+            color: '#0F0F0E', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          Done →
+        </button>
       </div>
 
       {/* Width counters */}
