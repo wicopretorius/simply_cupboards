@@ -207,8 +207,6 @@ export default function FloorPlan({ designId }: { designId: number }) {
     }
     return baseGeo
   }, [design, availableH])
-  const geoRef = useRef(geo)
-  geoRef.current = geo
 
   // ── Load ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -283,20 +281,10 @@ export default function FloorPlan({ designId }: { designId: number }) {
     const fx = fixRef.current.find(f => f.iid === sel)
     if (!fx) return
     const newRot = ((fx.rotation + delta) % 360 + 360) % 360
-    // Re-clamp position so the rotated fixture stays fully inside the room
-    const [szW, szH] = SZ[fx.type]
-    const fw = fx.widthMm ?? szW
-    const fh = fx.type === 'window' ? 150 : szH
-    const { eW, eH } = effectiveBbox(fw, fh, newRot)
-    const { bboxW, bboxH } = geoRef.current
-    const cx = Math.max(eW / 2, Math.min(bboxW - eW / 2, fx.x + fw / 2))
-    const cy = Math.max(eH / 2, Math.min(bboxH - eH / 2, fx.y + fh / 2))
-    const newX = cx - fw / 2
-    const newY = cy - fh / 2
-    setFixes(p => p.map(f => f.iid === sel ? { ...f, rotation: newRot, x: newX, y: newY } : f))
+    setFixes(p => p.map(f => f.iid === sel ? { ...f, rotation: newRot } : f))
     if (fx.dbId) {
       setSaving(true)
-      directus.request(updateItem('floor_fixtures', fx.dbId, { rotation: newRot, x: newX, y: newY }))
+      directus.request(updateItem('floor_fixtures', fx.dbId, { rotation: newRot }))
         .finally(() => setSaving(false))
     }
   }, [sel])
