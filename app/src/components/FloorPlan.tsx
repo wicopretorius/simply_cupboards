@@ -667,6 +667,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
                     )}
                     <text x={cx} y={cy + 4} textAnchor="middle"
                       fontSize={Math.max(8, Math.min(11, Math.min(pw, ph) * 0.18))} fill="#C8A96E" fontWeight="700"
+                      transform={rot ? `rotate(${-rot},${cx},${cy})` : undefined}
                       style={{ pointerEvents: 'none', userSelect: 'none' }}>
                       {LBL[fx.type]}
                     </text>
