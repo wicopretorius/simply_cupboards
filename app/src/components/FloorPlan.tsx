@@ -258,7 +258,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
         }
       })
       .finally(() => setSaving(false))
-  }, [addType, designId, geo])
+  }, [addType, designId, geo, winWidth, winHeight])
 
   // ── Delete selected ───────────────────────────────────────────────────────
   const removeSel = useCallback(() => {
