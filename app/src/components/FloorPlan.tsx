@@ -107,6 +107,14 @@ export const LBL: Record<FType, string> = {
 
 const ALL_TYPES = Object.keys(SZ) as FType[]
 
+const PALETTE_TABS: { label: string; types: FType[] }[] = [
+  { label: 'Windows',     types: ['window'] },
+  { label: 'Doors',       types: ['door'] },
+  { label: 'Electrical',  types: ['socket', 'light_switch', 'db_board'] },
+  { label: 'Plumbing',    types: ['sink', 'basin', 'drain'] },
+  { label: 'Appliances',  types: ['stove', 'oven'] },
+]
+
 const ROOM_FIXTURES: Partial<Record<string, FType[]>> = {
   kitchen:    ['door', 'window', 'sink', 'stove', 'oven', 'light_switch', 'socket', 'db_board'],
   bathroom:   ['door', 'window', 'basin', 'socket', 'light_switch', 'drain'],
@@ -143,7 +151,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
   const draggingRef           = useRef<string | null>(null)
   const rotHoldTimeout        = useRef<ReturnType<typeof setTimeout> | null>(null)
   const rotHoldInterval       = useRef<ReturnType<typeof setInterval> | null>(null)
-  const [addType, setAddType] = useState<FType>('basin')
+  const [addType, setAddType] = useState<FType>('window')
+  const [palTab,  setPalTab]  = useState(0)
   const [availableH, setAvailableH] = useState(400)
 
   fixRef.current = fixes
@@ -636,12 +645,35 @@ export default function FloorPlan({ designId }: { designId: number }) {
         </div>
 
         {/* ── Fixture toolbar ── */}
-        <div style={{ background: '#1A1917', borderRadius: 12, border: '1px solid #2A2825', padding: 12, flexShrink: 0 }}>          <div style={{ fontSize: 11, fontWeight: 600, color: '#6A6560', marginBottom: 10,
-            textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Add Fixture
+        {(() => {
+          const roomTypes = ROOM_FIXTURES[design?.room_type ?? ''] ?? ALL_TYPES
+          const visibleTabs = PALETTE_TABS.filter(tab => tab.types.some(t => roomTypes.includes(t)))
+          const activeTab = visibleTabs[Math.min(palTab, visibleTabs.length - 1)]
+          const tabTypes = activeTab?.types.filter(t => roomTypes.includes(t)) ?? []
+          return (
+        <div style={{ background: '#1A1917', borderRadius: 12, border: '1px solid #2A2825', padding: 12, flexShrink: 0 }}>
+          {/* Tab bar */}
+          <div style={{ display: 'flex', gap: 0, marginBottom: 10, borderBottom: '1px solid #2A2825', overflowX: 'auto' }}>
+            {visibleTabs.map((tab, i) => (
+              <button key={tab.label} onClick={() => {
+                const idx = Math.min(i, visibleTabs.length - 1)
+                setPalTab(idx)
+                const newTypes = PALETTE_TABS[PALETTE_TABS.indexOf(tab)].types.filter(t => roomTypes.includes(t))
+                if (newTypes.length > 0) setAddType(newTypes[0])
+              }} style={{
+                flex: 1, padding: '7px 4px', border: 'none', background: 'none',
+                borderBottom: `2px solid ${palTab === i ? '#C8A96E' : 'transparent'}`,
+                color: palTab === i ? '#C8A96E' : '#6A6560',
+                fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
+                letterSpacing: '0.3px', textTransform: 'uppercase', transition: 'color 0.15s',
+              }}>
+                {tab.label}
+              </button>
+            ))}
           </div>
+          {/* Fixture buttons for active tab */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-            {(ROOM_FIXTURES[design?.room_type ?? ''] ?? ALL_TYPES).map(t => (
+            {tabTypes.map(t => (
               <button key={t} onClick={() => setAddType(t)} style={{
                 flex: 1, padding: '8px 4px', borderRadius: 8,
                 background: addType === t ? 'rgba(200,169,110,0.18)' : '#242220',
@@ -717,6 +749,8 @@ export default function FloorPlan({ designId }: { designId: number }) {
             Hold to drag · tap trash to remove
           </p>
         </div>
+          )
+        })()}
       </div>
 
       <BottomNav designId={designId} />
