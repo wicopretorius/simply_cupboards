@@ -640,18 +640,7 @@ export default function FloorPlan({ designId }: { designId: number }) {
                       {LBL[fx.type]}
                     </text>
 
-                    {/* Selection ring */}
-                    {isSelected && (
-                      <rect
-                        x={sp.x - 5} y={sp.y - 5}
-                        width={pw + 10} height={ph + 10}
-                        fill="none"
-                        stroke="rgba(242,237,230,0.85)"
-                        strokeWidth={1.5}
-                        rx={5}
-                        style={{ pointerEvents: 'none' }}
-                      />
-                    )}
+                    
                   </g>
                 )
               })}
