@@ -571,10 +571,12 @@ export default function WallView({ designId }: { designId: number }) {
             {wallCount > 0 ? `Wall ${activeWallIdx + 1}/${wallCount} · ` : ''}{wallMm}mm{saving ? ' · saving…' : ''}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <IconBtn onClick={() => moveSelected(-1)}><ChevronLeft /></IconBtn>
-          <IconBtn onClick={() => moveSelected(1)}><ChevronRight /></IconBtn>
-        </div>
+        {wallCount > 1 && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <IconBtn onClick={() => setActiveWallIdx(i => (i - 1 + wallCount) % wallCount)}><ChevronLeft /></IconBtn>
+            <IconBtn onClick={() => setActiveWallIdx(i => (i + 1) % wallCount)}><ChevronRight /></IconBtn>
+          </div>
+        )}
         <button
           onClick={async () => {
             try {
