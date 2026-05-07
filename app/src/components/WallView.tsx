@@ -441,7 +441,7 @@ export default function WallView({ designId }: { designId: number }) {
           await persistReorder(updated)
         } else {
           // New cabinet from palette
-          const newCab: WallCabinet = { dbId: null, instanceId: uid(), item: ds.item, row: preview.row, sort: preview.index }
+          const newCab: WallCabinet = { dbId: null, instanceId: uid(), item: ds.item, row: preview.row, sort: preview.index, wall_id: activeWall?.id }
           const rowCabs = cabinetsRef.current.filter(c => c.row === preview.row).sort((a, b) => a.sort - b.sort)
           rowCabs.splice(preview.index, 0, newCab)
           const reordered = rowCabs.map((c, i) => ({ ...c, sort: i }))
