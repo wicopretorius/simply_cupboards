@@ -610,16 +610,7 @@ export default function WallView({ designId }: { designId: number }) {
       </div>
 
       {/* Wall canvas */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: 'linear-gradient(180deg,#1A1815 0%,#141210 100%)', position: 'relative' }}>
-        <div
-          onClick={() => setActiveWallIdx(i => (i - 1 + Math.max(1, wallCount)) % Math.max(1, wallCount))}
-          style={{ width: 24, flexShrink: 0, background: 'linear-gradient(90deg,#060605 0%,#1A1815 100%)', borderRight: '1px solid #3A3835', position: 'relative', cursor: wallCount > 1 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <div style={{ position: 'absolute', bottom: 22, right: -8, width: 32, height: 82, background: 'linear-gradient(90deg,#252220,#2E2A25)', border: '1px solid #3A3530', borderRight: 'none' }} />
-          {wallCount > 1 && <span style={{ fontSize: 10, color: 'rgba(200,169,110,0.5)', pointerEvents: 'none', zIndex: 1 }}>‹</span>}
-        </div>
-
-        <div ref={wallContainerRef} onClick={() => { setSelectedId(null); setSelWinId(null) }} style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      <div ref={wallContainerRef} onClick={() => { setSelectedId(null); setSelWinId(null) }} style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg,#1A1815 0%,#141210 100%)' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 8, background: '#2E2C29', borderBottom: '1px solid #3A3835' }} />
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 22, background: 'repeating-linear-gradient(90deg,#2A2520 0px,#2A2520 59px,#201E1B 59px,#201E1B 60px)', borderTop: '2px solid #4A4845' }} />
           <div style={{ position: 'absolute', inset: '8px 0 22px 0', background: 'linear-gradient(180deg,#1C1916 0%,#161412 100%)' }} />
@@ -707,15 +698,6 @@ export default function WallView({ designId }: { designId: number }) {
             ← {wallMm}mm →
           </div>
         </div>
-
-        <div
-          onClick={() => setActiveWallIdx(i => (i + 1) % Math.max(1, wallCount))}
-          style={{ width: 24, flexShrink: 0, background: 'linear-gradient(270deg,#060605 0%,#1A1815 100%)', borderLeft: '1px solid #3A3835', position: 'relative', cursor: wallCount > 1 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <div style={{ position: 'absolute', bottom: 22, left: -8, width: 32, height: 82, background: 'linear-gradient(270deg,#252220,#2E2A25)', border: '1px solid #3A3530', borderLeft: 'none' }} />
-          {wallCount > 1 && <span style={{ fontSize: 10, color: 'rgba(200,169,110,0.5)', pointerEvents: 'none', zIndex: 1 }}>›</span>}
-        </div>
-      </div>
 
       {/* Palette */}
       <div style={{ background: '#1A1917', borderTop: '1px solid #3A3835', flexShrink: 0 }}>
