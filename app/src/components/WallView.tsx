@@ -17,6 +17,7 @@ interface WallCabinet {
   item: PaletteItem
   row: 'base' | 'upper'
   sort: number
+  wall_id?: string | null
 }
 
 interface DragState {
@@ -199,6 +200,7 @@ export default function WallView({ designId }: { designId: number }) {
           item: c.palette_item_id as PaletteItem,
           row: c.row,
           sort: c.sort,
+          wall_id: c.wall_id,
         }))
         setCabinets(mapped)
 
@@ -230,8 +232,8 @@ export default function WallView({ designId }: { designId: number }) {
   }, [])
 
   const wallHeightMm = design?.wall_height_mm ?? 2400
-  const baseCabs  = cabinets.filter(c => c.row === 'base').sort((a, b) => a.sort - b.sort)
-  const upperCabs = cabinets.filter(c => c.row === 'upper').sort((a, b) => a.sort - b.sort)
+  const baseCabs  = cabinets.filter(c => c.row === 'base' && c.wall_id === activeWall?.id).sort((a, b) => a.sort - b.sort)
+  const upperCabs = cabinets.filter(c => c.row === 'upper' && c.wall_id === activeWall?.id).sort((a, b) => a.sort - b.sort)
 
   // ── Active wall geometry ───────────────────────────────────────────────────
   const roomWalls = useMemo(() => design?.room_shape?.walls ?? [], [design])
@@ -381,7 +383,7 @@ export default function WallView({ designId }: { designId: number }) {
   // ── Persist helpers ────────────────────────────────────────────────────────
   const persistAdd = async (item: PaletteItem, row: 'base' | 'upper', sortIndex: number) => {
     const rec = await directus.request(createItem('placed_cabinets', {
-      design_id: designId, palette_item_id: item.id, row, sort: sortIndex,
+      design_id: designId, palette_item_id: item.id, row, sort: sortIndex, wall_id: activeWall?.id,
     }))
     return (rec as any).id as number
   }

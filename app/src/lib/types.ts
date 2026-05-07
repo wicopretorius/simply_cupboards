@@ -54,6 +54,7 @@ export interface PlacedCabinet {
   palette_item_id: string | PaletteItem
   row: 'base' | 'upper'
   sort: number
+  wall_id?: string | null
 }
 
 export interface FloorFixture {
