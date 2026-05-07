@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { directus } from '@/lib/directus'
 import { readItem, readItems, createItem, updateItem, deleteItem } from '@directus/sdk'
@@ -140,6 +140,7 @@ export default function WallView({ designId }: { designId: number }) {
   const [wallHeightPx, setWallHeightPx] = useState(300)
   const [floorFixtures, setFloorFixtures] = useState<FloorFixture[]>([])
   const [selWinId, setSelWinId]         = useState<number | null>(null)
+  const [activeWallIdx, setActiveWallIdx] = useState(0)
 
   const dragRef          = useRef<DragState | null>(null)
   const cabinetsRef      = useRef<WallCabinet[]>([])
@@ -228,32 +229,63 @@ export default function WallView({ designId }: { designId: number }) {
     return () => ro.disconnect()
   }, [])
 
-  const wallMm       = design?.wall_mm ?? 4200
   const wallHeightMm = design?.wall_height_mm ?? 2400
   const baseCabs  = cabinets.filter(c => c.row === 'base').sort((a, b) => a.sort - b.sort)
   const upperCabs = cabinets.filter(c => c.row === 'upper').sort((a, b) => a.sort - b.sort)
 
-  // ── Wall 1 geometry ────────────────────────────────────────────────────────
-  const w1Angle  = ((design?.room_shape?.walls?.[0]?.angleDeg ?? 0) * Math.PI) / 180
-  const w1DirX   =  Math.cos(w1Angle)
-  const w1DirY   = -Math.sin(w1Angle)   // floor plan y increases downward
-  const w1NormX  =  Math.sin(w1Angle)   // inward normal (into room)
-  const w1NormY  =  Math.cos(w1Angle)
+  // ── Active wall geometry ───────────────────────────────────────────────────
+  const roomWalls = useMemo(() => design?.room_shape?.walls ?? [], [design])
+  const wallCount = roomWalls.length
 
-  // Windows that touch / are near Wall 1
-  const WIN_THRESH = 350   // mm perpendicular snap distance
+  const wallStarts = useMemo(() => {
+    const starts: { x: number; y: number }[] = []
+    let cx = 0, cy = 0
+    for (const w of roomWalls) {
+      starts.push({ x: cx, y: cy })
+      const rad = (w.angleDeg * Math.PI) / 180
+      cx += w.lengthMm * Math.cos(rad)
+      cy -= w.lengthMm * Math.sin(rad)
+    }
+    return starts
+  }, [roomWalls])
+
+  const activeWall = roomWalls[activeWallIdx]
+  const wallMm     = activeWall?.lengthMm ?? design?.wall_mm ?? 4200
+  const wAngle     = ((activeWall?.angleDeg ?? 0) * Math.PI) / 180
+  const wDirX      =  Math.cos(wAngle)
+  const wDirY      = -Math.sin(wAngle)
+  const wNormX     =  Math.sin(wAngle)
+  const wNormY     =  Math.cos(wAngle)
+  const wallStart  = wallStarts[activeWallIdx] ?? { x: 0, y: 0 }
+
+  const WIN_THRESH = 350
 
   const wallWindows = floorFixtures
     .filter(fx => fx.type === 'window')
     .map(fx => {
-      const distAlong = fx.x * w1DirX + fx.y * w1DirY
-      const perpDist  = fx.x * w1NormX + fx.y * w1NormY
-      const wMm   = fx.width_mm  ?? 900
-      const hMm   = fx.height_mm ?? 1200
-      const sill  = fx.sill_height_mm ?? 900
+      const relX = fx.x - wallStart.x
+      const relY = fx.y - wallStart.y
+      const distAlong = relX * wDirX + relY * wDirY
+      const perpDist  = relX * wNormX + relY * wNormY
+      const wMm  = fx.width_mm  ?? 900
+      const hMm  = fx.height_mm ?? 1200
+      const sill = fx.sill_height_mm ?? 900
       return { fx, distAlong, perpDist, wMm, hMm, sill }
     })
     .filter(w => w.perpDist >= 0 && w.perpDist < WIN_THRESH && w.distAlong >= 0 && w.distAlong <= wallMm)
+
+  const wallDoors = floorFixtures
+    .filter(fx => fx.type === 'door')
+    .map(fx => {
+      const relX = fx.x - wallStart.x
+      const relY = fx.y - wallStart.y
+      const distAlong = relX * wDirX + relY * wDirY
+      const perpDist  = relX * wNormX + relY * wNormY
+      const wMm  = fx.width_mm  ?? 900
+      const hMm  = fx.height_mm ?? 2100
+      return { fx, distAlong, perpDist, wMm, hMm }
+    })
+    .filter(d => d.perpDist >= 0 && d.perpDist < WIN_THRESH && d.distAlong >= 0 && d.distAlong <= wallMm)
 
   // Elevation scale: floor at (wallHeightPx - 22)px, ceiling at 8px
   const FLOOR_PX = 22
@@ -280,8 +312,8 @@ export default function WallView({ designId }: { designId: number }) {
       // Horizontal: move along wall
       const dxMm = ((ev.clientX - wr.startClientX) / wallPx) * wallMm
       const newDist = Math.max(0, Math.min(wallMm - win.wMm, wr.startDistMm + dxMm))
-      const newX = newDist * w1DirX + wr.perpDist * w1NormX
-      const newY = newDist * w1DirY + wr.perpDist * w1NormY
+      const newX = wallStart.x + newDist * wDirX + wr.perpDist * wNormX
+      const newY = wallStart.y + newDist * wDirY + wr.perpDist * wNormY
       // Vertical: drag up = higher sill (invert because screen-y and mm-from-floor are opposite)
       const dyMm = -((ev.clientY - startClientY) / elevPx) * wallHeightMm
       const newSill = Math.max(0, Math.min(wallHeightMm - win.hMm, Math.round(startSill + dyMm)))
@@ -303,7 +335,7 @@ export default function WallView({ designId }: { designId: number }) {
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wallMm, wallPx, wallHeightMm, elevPx, w1DirX, w1DirY, w1NormX, w1NormY])
+  }, [wallMm, wallPx, wallHeightMm, elevPx, wDirX, wDirY, wNormX, wNormY, wallStart.x, wallStart.y])
 
   // ── Update window field and save ──────────────────────────────────────────
   const updateWindowField = useCallback((id: number, patch: Partial<FloorFixture>) => {
@@ -535,7 +567,9 @@ export default function WallView({ designId }: { designId: number }) {
         <IconBtn onClick={() => router.push('/designs')}><ChevronLeft /></IconBtn>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#F2EDE6' }}>{design?.name ?? 'Cupboards'}</div>
-          <div style={{ fontSize: 10, color: '#6A6560' }}>{wallMm}mm wide{saving ? ' · saving…' : ''}</div>
+          <div style={{ fontSize: 10, color: '#6A6560' }}>
+            {wallCount > 0 ? `Wall ${activeWallIdx + 1}/${wallCount} · ` : ''}{wallMm}mm{saving ? ' · saving…' : ''}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <IconBtn onClick={() => moveSelected(-1)}><ChevronLeft /></IconBtn>
@@ -575,8 +609,12 @@ export default function WallView({ designId }: { designId: number }) {
 
       {/* Wall canvas */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: 'linear-gradient(180deg,#1A1815 0%,#141210 100%)', position: 'relative' }}>
-        <div style={{ width: 24, flexShrink: 0, background: 'linear-gradient(90deg,#060605 0%,#1A1815 100%)', borderRight: '1px solid #3A3835', position: 'relative' }}>
+        <div
+          onClick={() => setActiveWallIdx(i => (i - 1 + Math.max(1, wallCount)) % Math.max(1, wallCount))}
+          style={{ width: 24, flexShrink: 0, background: 'linear-gradient(90deg,#060605 0%,#1A1815 100%)', borderRight: '1px solid #3A3835', position: 'relative', cursor: wallCount > 1 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
           <div style={{ position: 'absolute', bottom: 22, right: -8, width: 32, height: 82, background: 'linear-gradient(90deg,#252220,#2E2A25)', border: '1px solid #3A3530', borderRight: 'none' }} />
+          {wallCount > 1 && <span style={{ fontSize: 10, color: 'rgba(200,169,110,0.5)', pointerEvents: 'none', zIndex: 1 }}>‹</span>}
         </div>
 
         <div ref={wallContainerRef} onClick={() => { setSelectedId(null); setSelWinId(null) }} style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -584,6 +622,33 @@ export default function WallView({ designId }: { designId: number }) {
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 22, background: 'repeating-linear-gradient(90deg,#2A2520 0px,#2A2520 59px,#201E1B 59px,#201E1B 60px)', borderTop: '2px solid #4A4845' }} />
           <div style={{ position: 'absolute', inset: '8px 0 22px 0', background: 'linear-gradient(180deg,#1C1916 0%,#161412 100%)' }} />
           <div style={{ position: 'absolute', bottom: 108, left: 0, right: 0, height: 7, background: 'linear-gradient(180deg,#5A4A35,#3A3025)', borderTop: '2px solid #6A5A45', zIndex: 5 }} />
+          {/* Doors from floor plan — rendered as openings */}
+          {wallDoors.map(door => {
+            const leftPx   = (door.distAlong / wallMm) * wallPx
+            const widthPx  = Math.max(8, (door.wMm / wallMm) * wallPx)
+            const topPx    = Math.max(CEIL_PX, mmToElev(door.hMm))
+            const botPx    = mmToElev(0)
+            const heightPx = Math.max(8, botPx - topPx)
+            return (
+              <div
+                key={door.fx.id}
+                style={{
+                  position: 'absolute', left: leftPx, top: topPx,
+                  width: widthPx, height: heightPx,
+                  background: 'rgba(15,15,14,0.85)',
+                  border: '1px solid rgba(200,169,110,0.25)',
+                  borderBottom: 'none',
+                  zIndex: 4, pointerEvents: 'none',
+                }}
+              >
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'rgba(200,169,110,0.35)' }} />
+                <div style={{ position: 'absolute', bottom: -12, left: 0, fontSize: 7, color: 'rgba(200,169,110,0.45)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  {door.wMm}
+                </div>
+              </div>
+            )
+          })}
+
           {/* Dynamic windows from floor plan */}
           {wallWindows.map(win => {
             const leftPx   = (win.distAlong / wallMm) * wallPx
@@ -641,8 +706,12 @@ export default function WallView({ designId }: { designId: number }) {
           </div>
         </div>
 
-        <div style={{ width: 24, flexShrink: 0, background: 'linear-gradient(270deg,#060605 0%,#1A1815 100%)', borderLeft: '1px solid #3A3835', position: 'relative' }}>
+        <div
+          onClick={() => setActiveWallIdx(i => (i + 1) % Math.max(1, wallCount))}
+          style={{ width: 24, flexShrink: 0, background: 'linear-gradient(270deg,#060605 0%,#1A1815 100%)', borderLeft: '1px solid #3A3835', position: 'relative', cursor: wallCount > 1 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
           <div style={{ position: 'absolute', bottom: 22, left: -8, width: 32, height: 82, background: 'linear-gradient(270deg,#252220,#2E2A25)', border: '1px solid #3A3530', borderLeft: 'none' }} />
+          {wallCount > 1 && <span style={{ fontSize: 10, color: 'rgba(200,169,110,0.5)', pointerEvents: 'none', zIndex: 1 }}>›</span>}
         </div>
       </div>
 
