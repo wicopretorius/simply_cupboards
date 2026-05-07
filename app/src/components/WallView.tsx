@@ -232,8 +232,6 @@ export default function WallView({ designId }: { designId: number }) {
   }, [])
 
   const wallHeightMm = design?.wall_height_mm ?? 2400
-  const baseCabs  = cabinets.filter(c => c.row === 'base' && (!c.wall_id || c.wall_id === activeWall?.id)).sort((a, b) => a.sort - b.sort)
-  const upperCabs = cabinets.filter(c => c.row === 'upper' && (!c.wall_id || c.wall_id === activeWall?.id)).sort((a, b) => a.sort - b.sort)
 
   // ── Active wall geometry ───────────────────────────────────────────────────
   const roomWalls = useMemo(() => design?.room_shape?.walls ?? [], [design])
@@ -259,6 +257,9 @@ export default function WallView({ designId }: { designId: number }) {
   const wNormX     =  Math.sin(wAngle)
   const wNormY     =  Math.cos(wAngle)
   const wallStart  = wallStarts[activeWallIdx] ?? { x: 0, y: 0 }
+
+  const baseCabs  = cabinets.filter(c => c.row === 'base' && (!c.wall_id || c.wall_id === activeWall?.id)).sort((a, b) => a.sort - b.sort)
+  const upperCabs = cabinets.filter(c => c.row === 'upper' && (!c.wall_id || c.wall_id === activeWall?.id)).sort((a, b) => a.sort - b.sort)
 
   const WIN_THRESH = 350
 
